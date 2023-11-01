@@ -27,7 +27,35 @@
 
 {% block primary_content_inner %}
   <h1 >{% block form_title %}{{ _('Transform Status') }}{% endblock %}</h1>
-  {% block form %}{% endblock %}
+  {% block form %}
+  <form method="post" action="{{ action }}" class="csvwmapandtransform-form">
+    {{ h.csrf_input() }} 
+    <button class="btn btn-primary" name="save" type="submit">
+      <i class="fa fa-play"></i> {{ _('Run Transformation') }}
+    </button>
+  </form>
+  {% endblock %}
+  {{transform_status}}
+  {% if transform_status %}
+  <table class="table table-bordered">
+    <colgroup>
+      <col width="150">
+      <col>
+    </colgroup>
+    <tr>
+      <th>{{ _('Status') }}</th>
+      <td>{{ h.csvwmapandtransform__status_description(transform_status) }}</td>
+    </tr>
+    <tr>
+      <th>{{ _('Last updated') }}</th>
+      {% if status.status %}
+        <td><span class="date" title="{{ h.render_datetime(status.last_updated, with_hours=True) }}">{{ h.time_ago_from_timestamp(status.last_updated) }}</span></td>
+      {% else %}
+        <td>{{ _('Never') }}</td>
+      {% endif %}
+    </tr>
+  </table>
+  {% endif %}
 {% endblock %}
 
 {% block secondary_content %}
