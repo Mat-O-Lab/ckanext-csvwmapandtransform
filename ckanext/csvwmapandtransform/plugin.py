@@ -9,6 +9,17 @@ import ckanext.csvwmapandtransform.views as views
 
 log = __import__("logging").getLogger(__name__)
 
+DEFAULT_FORMATS = [
+    "json-ld",
+    "turtle",
+    "n3",
+    "nt",
+    "hext",
+    "trig",
+    "longturtle",
+    "xml"
+]
+
 
 class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     plugins.implements(plugins.ITranslation)
@@ -39,19 +50,19 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
         """
         if operation == "deleted":
             return
-
         log.debug(
-            "notify: {} {} '{}'".format(operation, type(entity).__name__, entity.name)
+            "notify: {} {} '{}'".format(operation, type(entity).__name__, entity)
         )
         if isinstance(entity, model.Resource):
             log.debug("new uploaded resource")
             dataset = entity.related_packages()[0]
             
-            if entity.format in ("json-ld","turtle") and "-joined" not in entity.url:
+            if entity.format in DEFAULT_FORMATS and "-joined" not in entity.url:
                 log.debug("plugin notify event for resource: {}".format(entity.id))
-                action.enqueue_find_mapping(
-                    entity.id, entity.name, entity.url, dataset.id, operation
-                )
+                toolkit.get_action('csvwmapandtransform_transform')({},{u'id': entity.id})
+                # action.enqueue_find_mapping(
+                #     entity.id, entity.name, entity.url, dataset.id, operation
+                # )
         else:
             return
 

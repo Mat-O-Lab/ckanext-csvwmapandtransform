@@ -43,14 +43,19 @@ class TransformView(MethodView):
 
         except (logic.NotFound, logic.NotAuthorized):
             base.abort(404, _(u'Resource not found'))
-        try:
-            transform_status=toolkit.get_action(u'csvwmapandtransform_transform_status')(
-                    {}, {
+        transform_status=toolkit.get_action(u'csvwmapandtransform_transform_status')(
+            {}, {
                         u'resource_id': resource_id
                     }
-            )
-        except:
-            transform_status=None
+        )
+        # try:
+        #     transform_status=toolkit.get_action(u'csvwmapandtransform_transform_status')(
+        #             {}, {
+        #                 u'resource_id': resource_id
+        #             }
+        #     )
+        # except:
+        #     transform_status=None
             
     
         return base.render(

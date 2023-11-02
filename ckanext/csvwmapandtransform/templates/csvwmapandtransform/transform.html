@@ -47,12 +47,6 @@
       <td>{{ h.csvwmapandtransform__status_description(transform_status) }}</td>
     </tr>
     <tr>
-      <th>{{ _('Last updated') }}</th>
-      {% if status.status %}
-        <td><span class="date" title="{{ h.render_datetime(status.last_updated, with_hours=True) }}">{{ h.time_ago_from_timestamp(status.last_updated) }}</span></td>
-      {% else %}
-        <td>{{ _('Never') }}</td>
-      {% endif %}
     </tr>
   </table>
   {% endif %}
