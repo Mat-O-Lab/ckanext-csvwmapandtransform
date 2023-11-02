@@ -57,7 +57,9 @@ def find_mapping(res_url, res_id, dataset_id, skip_if_no_changes=True):
     #                 u'map_urls': [res['url'] for res in mapping_resources]
     #             }
     #         )
-    res=[{'mapping': res,'test': mapper.check_mapping(map_url=res['url'], data_url=tomap_res['url'])} for res in mappings]
+    log.debug("testing mappings with: {}".format(tomap_res['url']))
+    # tests=get_action(u'csvwmapandtransform_test_map
+    res=[{'mapping': res,'test': mapper.check_mapping(map_url=res['url'], data_url=tomap_res['url'], authorization=CSVWMAPANDTRANSFORM_TOKEN)} for res in mappings]
     for item in res:
         if item['test']:
             #the more rules can be applied and the more are not skipped the better the mapping
@@ -71,10 +73,9 @@ def find_mapping(res_url, res_id, dataset_id, skip_if_no_changes=True):
     else:
         best_condidate=None
     #run mapping and join data
-    filename, graph_data, num_applied, num_skipped = mapper.get_joined_rdf(map_url= best_condidate,data_url=tomap_res['url'])
+    filename, graph_data, num_applied, num_skipped = mapper.get_joined_rdf(map_url= best_condidate,data_url=tomap_res['url'],authorization=CSVWMAPANDTRANSFORM_TOKEN)
     s = requests.Session()
     s.headers.update({"Authorization": CSVWMAPANDTRANSFORM_TOKEN})
-    tomap_data = s.get(tomap_res["url"]).content
     prefix, suffix = filename.rsplit(".", 1)
     if not prefix:
         prefix = "unnamed"
