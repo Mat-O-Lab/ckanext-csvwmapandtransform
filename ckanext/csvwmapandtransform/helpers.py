@@ -19,7 +19,16 @@ def csvwmapandtransform__status_description(status: dict[str, Any]):
     else:
         return _('Not Uploaded Yet')
 
+def csvwmapandtransform_show_tools(resource):
+    from ckanext.csvwmapandtransform.plugin import DEFAULT_FORMATS
+    if resource['format'].lower() in DEFAULT_FORMATS:
+        return True
+    else:
+        False
+
 def get_helpers():
     return {
         "csvwmapandtransform__status_description": csvwmapandtransform__status_description,
+        "csvwmapandtransform_show_tools": csvwmapandtransform_show_tools
     }
+
