@@ -147,11 +147,12 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
                 #     **resource)
                 resource["id"] = ressouce_existing["id"]
                 metadata_res=get_action("resource_update")({"ignore_auth": True}, resource)
+        logger.info("job completed results at {}".format(metadata_res['url']))
+    
     else:
         logger.warning("found no mapping candidate for resource {}".format(tomap_res["url"]))
     #all is done update job status
     job_dict['status'] = 'complete'
-    logger.info("job completed results at {}".format(metadata_res['url']))
     callback_csvwmapandtransform_hook(callback_url,
                           api_key=CSVWMAPANDTRANSFORM_TOKEN,
                           job_dict=job_dict)
