@@ -76,7 +76,7 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
         format=resource_dict.get('format',None)
         submit = (
             format
-            and format.lower() in DEFAULT_FORMATS
+            and format.lower() in DEFAULT_FORMATS and "-joined" not in resource_dict['url']
         )
         log.debug(
                 u'Submitting resource {0} with format {1}'.format(resource_dict['id'],format) +
