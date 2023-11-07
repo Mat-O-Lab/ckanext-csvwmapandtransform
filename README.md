@@ -11,9 +11,17 @@ Point at it through env variables.
 Also needed is a Api Token for an account with the right privaledges to make the background job work on private datasets and ressources.
 
 ```bash
-CKAN_MAPTOMETHOD_URL=http://${MAPTOMETHOD_HOST}:${MAPTOMETHOD_APP_PORT}
-CKAN_RDFCONVERTER_URL=http://${RDFCONVERTER_HOST}:${RDFCONVERTER_APP_PORT}
 CSVWMAPANDTRANSFORM_TOKEN=${CKAN_API_TOKEN}
+MAPTOMETHOD_CONTAINER_NAME="ckan_maptomethod"
+MAPTOMETHOD_APP_PORT=5002
+CKAN_MAPTOMETHOD_URL=http://${MAPTOMETHOD_CONTAINER_NAME}:${MAPTOMETHOD_APP_PORT}
+RDFCONVERTER_CONTAINER_NAME="ckan_rdfconverter"
+RDFCONVERTER_APP_PORT=5003
+CKAN_RDFCONVERTER_URL=http://${RDFCONVERTER_CONTAINER_NAME}:${RDFCONVERTER_APP_PORT}
+CSVWMAPANDTRANSFORM_SQLALCHEMY_URL=postgresql://ckandbuser:ckandbpassword@db/ckandb
+PARSER_PORT=3001
+MAPPER_PORT=4000
+CONVERTER_PORT=5000
 ```
 
 **TODO:** For example, you might want to mention here which versions of CKAN this
