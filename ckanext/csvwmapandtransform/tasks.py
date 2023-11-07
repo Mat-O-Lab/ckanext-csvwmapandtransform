@@ -135,7 +135,7 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
                 format="turtle",
             )
             if not ressouce_existing:
-                logger.info("Writing new resource to - {}".format(ressouce_existing['url']))
+                logger.info("Writing new resource {} to dataset {}".format(filename,dataset_id))
                 # local_ckan.action.resource_create(**resource)
                 metadata_res = get_action("resource_create")(
                     {"ignore_auth": True}, resource
@@ -151,7 +151,7 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
         logger.warning("found no mapping candidate for resource {}".format(tomap_res["url"]))
     #all is done update job status
     job_dict['status'] = 'complete'
-    logger.info("job completed")
+    logger.info("job completed results at {}".format(metadata_res['url']))
     callback_csvwmapandtransform_hook(callback_url,
                           api_key=CSVWMAPANDTRANSFORM_TOKEN,
                           job_dict=job_dict)

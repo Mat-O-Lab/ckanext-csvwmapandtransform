@@ -4,6 +4,9 @@ import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 from ckan import model
 from ckan.lib.plugins import DefaultTranslation
+from ckan.types import Context
+from typing import Any
+
 from ckanext.csvwmapandtransform import action, helpers
 import ckanext.csvwmapandtransform.views as views
 
@@ -25,9 +28,9 @@ DEFAULT_FORMATS = [
 class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     plugins.implements(plugins.ITranslation)
     plugins.implements(plugins.IConfigurer)
-    plugins.implements(plugins.IDomainObjectModification)
     plugins.implements(plugins.ITemplateHelpers)
-    plugins.implements(plugins.IPackageController, inherit=True)
+    plugins.implements(plugins.IResourceUrlChange)
+    plugins.implements(plugins.IResourceController, inherit=True)
     plugins.implements(plugins.IActions)
     # plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IBlueprint)
@@ -40,34 +43,63 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
         toolkit.add_public_directory(config_, "public")
         toolkit.add_resource("fanstatic", "csvwmapandtransform")
 
-    # IDomainObjectModification
+    # IResourceUrlChange
 
-    def notify(self, entity, operation):
-        """
-        Send a notification on entity modification.
-
-        :param entity: instance of module.Package.
-        :param operation: 'new', 'changed' or 'deleted'.
-        """
-        if operation == "deleted":
-            return
-        
-        log.debug(
-            "notify: {} {} '{}'".format(operation, type(entity), entity)
+    def notify(self, resource: model.Resource):
+        context: Context = {'ignore_auth': True}
+        resource_dict = p.toolkit.get_action(u'resource_show')(
+            context, {
+                u'id': resource.id,
+            }
         )
-        if isinstance(entity, model.Resource):
-            log.debug("new uploaded resource")
-            dataset = entity.related_packages()[0]
-            
-            if entity.format in DEFAULT_FORMATS and "-joined" not in entity.url:
-                log.debug("plugin notify event for resource: {}".format(entity.id))
-                toolkit.get_action('csvwmapandtransform_transform')({"ignore_auth": True},{u'id': entity.id})
-                # action.enqueue_find_mapping(
-                #     entity.id, entity.name, entity.url, dataset.id, operation
-                # )
-        else:
-            return
+        self._submit_to_datapusher(resource_dict)
 
+    # IResourceController
+
+    def after_resource_create(
+            self, context: Context, resource_dict: dict[str, Any]):
+
+        self._sumbit_transform(resource_dict)
+
+    def after_update(
+            self, context: Context, resource_dict: dict[str, Any]):
+
+        self._sumbit_transform(resource_dict)
+
+    
+    def _sumbit_transform(self, resource_dict: dict[str, Any]):
+        context = {
+            u'model': model,
+            u'ignore_auth': True,
+            u'defer_commit': True
+        }
+        format=resource_dict.get('format',None)
+        submit = (
+            format
+            and format.lower() in DEFAULT_FORMATS
+        )
+        log.debug(
+                u'Submitting resource {0} with format {1}'.format(resource_dict['id'],format) +
+                u' to csvwmapandtransform_transform'
+            )
+        
+        if not submit:
+            return
+            
+        try:
+            log.debug(
+                u'Submitting resource {0}'.format(resource_dict['id']) +
+                u' to csvwmapandtransform_transform'
+            )
+            toolkit.get_action('csvwmapandtransform_transform')(context,{'id': resource_dict['id']})
+             
+        except toolkit.ValidationError as e:
+            # If datapusher is offline want to catch error instead
+            # of raising otherwise resource save will fail with 500
+            log.critical(e)
+            pass
+
+    
     # ITemplateHelpers
 
     def get_helpers(self):

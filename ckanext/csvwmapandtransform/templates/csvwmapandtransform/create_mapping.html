@@ -27,7 +27,14 @@
 
 {% block primary_content_inner %}
   <h1 >{% block form_title %}{{ _('Map resource') }}{% endblock %}</h1>
-  {% block form %}{% endblock %}
+  {% block form %}
+  <form method="post" action="{{ action }}" class="csvwmapandtransform-form">
+    {{ h.csrf_input() }} 
+    <button class="btn btn-primary" name="Start Mapping" type="submit">
+      <i class="fa fa-play"></i> {{ _('Run Transformation') }}
+    </button>
+  </form>
+  {% endblock %}
 {% endblock %}
 
 {% block secondary_content %}
