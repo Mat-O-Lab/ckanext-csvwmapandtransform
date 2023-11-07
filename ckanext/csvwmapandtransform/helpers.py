@@ -21,7 +21,7 @@ def csvwmapandtransform__status_description(status: dict[str, Any]):
 
 def csvwmapandtransform_show_tools(resource):
     from ckanext.csvwmapandtransform.plugin import DEFAULT_FORMATS
-    if resource['format'].lower() in DEFAULT_FORMATS:
+    if resource['format'].lower() in DEFAULT_FORMATS and"-joined" not in resource['url']:
         return True
     else:
         False
