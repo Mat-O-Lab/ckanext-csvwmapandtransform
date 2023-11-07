@@ -52,7 +52,7 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
                 u'id': resource.id,
             }
         )
-        self._submit_to_datapusher(resource_dict)
+        self._sumbit_transform(resource_dict)
 
     # IResourceController
 
@@ -94,7 +94,7 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
             toolkit.get_action('csvwmapandtransform_transform')(context,{'id': resource_dict['id']})
              
         except toolkit.ValidationError as e:
-            # If datapusher is offline want to catch error instead
+            # If RDFConverter is offline want to catch error instead
             # of raising otherwise resource save will fail with 500
             log.critical(e)
             pass
