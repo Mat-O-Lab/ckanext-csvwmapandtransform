@@ -28,23 +28,6 @@ if not SSL_VERIFY:
 
 
 from werkzeug.datastructures import FileStorage as FlaskFileStorage
-
-
-def update_resource_file(resource_id, f):
-    context = {
-        "ignore_auth": True,
-        "user": "",
-    }
-    upload = cgi.FieldStorage()
-    upload.filename = getattr(f, "name", "data")
-    upload.file = f
-    data = {
-        "id": resource_id,
-        "url": "will-be-overwritten-automatically",
-        "upload": upload,
-    }
-    return get_action("resource_update")(context, data)
-
 from rq import get_current_job
 
 
