@@ -52,6 +52,10 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
     # url = '{ckan}/dataset/{pkg}/resource/{res_id}/download/{filename}'.format(
     #         ckan=CKAN_URL, pkg=dataset_id, res_id=res_id, filename=res_url)
     tomap_res = get_action("resource_show")({"ignore_auth": True}, {"id": res_id})
+    context={
+        'session': model.meta.create_local_session(),
+        "ignore_auth": True
+        }
     metadata = {
             'ckan_url': CKAN_URL,
             'resource_id': res_id,
@@ -138,7 +142,7 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
                 logger.info("Writing new resource {} to dataset {}".format(filename,dataset_id))
                 # local_ckan.action.resource_create(**resource)
                 metadata_res = get_action("resource_create")(
-                    {"ignore_auth": True}, resource
+                    context, resource
                 )
             else:
                 logger.info("Updating resource - {}".format(ressouce_existing["url"]))
@@ -146,7 +150,7 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
                 #     id=res['id'],
                 #     **resource)
                 resource["id"] = ressouce_existing["id"]
-                metadata_res=get_action("resource_update")({"ignore_auth": True}, resource)
+                metadata_res=get_action("resource_update")(context, resource)
         logger.info("job completed results at {}".format(metadata_res['url']))
     
     else:
