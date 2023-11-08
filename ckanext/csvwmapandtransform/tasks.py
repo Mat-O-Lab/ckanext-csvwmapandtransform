@@ -6,7 +6,7 @@ import ckanapi
 import ckanapi.datapackage
 import requests
 from ckan.plugins.toolkit import get_action, asbool
-
+from ckan import model
 import datetime
 #from ckanext.csvtocsvw.annotate import annotate_csv_upload
 from ckanext.csvwmapandtransform import mapper, db
