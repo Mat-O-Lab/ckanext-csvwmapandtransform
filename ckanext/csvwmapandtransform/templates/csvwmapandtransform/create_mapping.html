@@ -20,21 +20,14 @@
 {% endblock %}
 
 {% block content_primary_nav %}
-  <!-- {{ h.build_nav_icon(pkg.type ~ '_resource.edit', _('Edit resource'), id=pkg.name, resource_id=res.id, icon='pencil') }}
-  {% block inner_primary_nav %}{% endblock %}
-  {{ h.build_nav_icon(pkg.type ~ '_resource.views', _('Views'), id=pkg.name, resource_id=res.id, icon='chart-bar') }} -->
 {% endblock %}
 
 {% block primary_content_inner %}
   <h1 >{% block form_title %}{{ _('Map resource') }}{% endblock %}</h1>
-  {% block form %}
-  <form method="post" action="{{ action }}" class="csvwmapandtransform-form">
-    {{ h.csrf_input() }} 
-    <button class="btn btn-primary" name="Start Mapping" type="submit">
-      <i class="fa fa-play"></i> {{ _('Run Transformation') }}
-    </button>
-  </form>
+  {% block form %}  
   {% endblock %}
+  <iframe class="col-12" name="my-iframe" src="{{iframe_url}}"" onload='javascript:(function(o){o.style.height=o.contentWindow.document.body.scrollHeight+"px";}(this));' style="height:200px;width:100%;border:none;overflow:hidden;"></iframe>
+  
 {% endblock %}
 
 {% block secondary_content %}
@@ -44,5 +37,10 @@
 
 {% block scripts %}
   {{ super() }}
+  <!-- <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      document.getElementById("my-form").submit();
+    });
+  </script> -->
   {% asset 'vendor/fileupload' %}
 {% endblock %}

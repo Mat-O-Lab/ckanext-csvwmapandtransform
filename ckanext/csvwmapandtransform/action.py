@@ -7,7 +7,7 @@ import json
 from ckanext.csvwmapandtransform import mapper, db
 from ckanext.csvwmapandtransform.tasks import transform
 
-
+from flask import render_template
 import ckan.plugins.toolkit as toolkit
 import ckanapi
 import itertools
@@ -15,12 +15,16 @@ import datetime
 from dateutil.parser import parse as parse_date
 from dateutil.parser import isoparse as parse_iso_date
 import sqlalchemy as sa
+import requests
+import os
 
 log = __import__("logging").getLogger(__name__)
 #must be lower case alphanumeric and these symbols: -_
 MAPPING_GROUP = "mappings"
 METHOD_GROUP = "methods"
 JOB_TIMEOUT = 180
+
+CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 
 
 # @toolkit.chained_action  # requires CKAN 2.7+
@@ -91,7 +95,20 @@ def csvwmapandtransform_transform(
 
 
 def csvwmapandtransform_map(context, data_dict):
-    pass
+    if 'data_url' in data_dict:
+        url = data_dict['data_url']
+    headers = {'Content-Type': 'application/json',
+                   'Authorization': CSVWMAPANDTRANSFORM_TOKEN,
+                   'Accept': 'text/html',
+                   }
+    log.debug(data_dict)
+    data= {'data_url': url}
+    html=requests.post(url="http://docker-dev.iwm.fraunhofer.de:6002/create_mapper", headers=headers, data=json.dumps(data))
+    html.raise_for_status()
+    result=html.text
+    #log.debug('Response from MapToMethod: {}'.format(result))
+    return result
+
 
 #@toolkit.side_effect_free
 def csvwmapandtransform_transform_status(

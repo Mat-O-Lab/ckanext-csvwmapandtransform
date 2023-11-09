@@ -12,7 +12,7 @@
 .resource-item .btn-group {
     position: relative!important;
     top: 10px;
-    /* right: 10px; */
+    right: 0px!important;
     flex: 0 0 auto;
     padding: 0.25rem !important;
     /* width: 16.66666667%; */
