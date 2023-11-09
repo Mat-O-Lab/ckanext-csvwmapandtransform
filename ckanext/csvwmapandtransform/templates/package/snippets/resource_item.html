@@ -3,7 +3,7 @@
 {% block resource_item_explore %}
   {{ super() }}
     {% if not url_is_edit and h.csvwmapandtransform_show_tools(res) %}
-    <div class="dropdown btn-group" style="position:unset;">
+    <div class="dropdown btn-group">
       <a href="#" class="btn btn-primary dropdown-toggle" type="button" id="dropdownMapTransform" data-bs-toggle="dropdown" aria-expanded="false">
         <i class="fa fa-share"></i>
         {{ _('Map&Transform') }}
