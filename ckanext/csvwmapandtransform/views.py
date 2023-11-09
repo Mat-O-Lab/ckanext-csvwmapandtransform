@@ -7,6 +7,7 @@ import os
 import requests
 import json
 CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
+MAPTOMETHOD_URL = os.environ.get("CKAN_SITE_URL")+":"+os.environ.get("MAPTOMETHOD_APP_PORT")
 
 
 log = __import__("logging").getLogger(__name__)
@@ -127,7 +128,7 @@ def iframe_maptomethod(id,resource_id):
         'advanced-method_object_super_class_uris-0': 'https://spec.industrialontologies.org/ontology/core/Core/InformationContentEntity',
         'advanced-method_object_super_class_uris-1': 'http://purl.obolibrary.org/obo/BFO_0000008',
     }
-    html=requests.post(url="http://docker-dev.iwm.fraunhofer.de:6002/create_mapper", headers=headers, data=json.dumps(data))
+    html=requests.post(url=MAPTOMETHOD_URL+"/create_mapper", headers=headers, data=json.dumps(data))
     html.raise_for_status()
     result=html.text
     #log.debug('Response from MapToMethod: {}'.format(result))
