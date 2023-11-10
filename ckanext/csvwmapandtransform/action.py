@@ -94,23 +94,7 @@ def csvwmapandtransform_transform(
     return res
 
 
-def csvwmapandtransform_map(context, data_dict):
-    if 'data_url' in data_dict:
-        url = data_dict['data_url']
-    headers = {'Content-Type': 'application/json',
-                   'Authorization': CSVWMAPANDTRANSFORM_TOKEN,
-                   'Accept': 'text/html',
-                   }
-    log.debug(data_dict)
-    data= {'data_url': url}
-    html=requests.post(url="http://docker-dev.iwm.fraunhofer.de:6002/create_mapper", headers=headers, data=json.dumps(data))
-    html.raise_for_status()
-    result=html.text
-    #log.debug('Response from MapToMethod: {}'.format(result))
-    return result
-
-
-#@toolkit.side_effect_free
+@toolkit.side_effect_free
 def csvwmapandtransform_transform_status(
         context: Context, data_dict: dict[str, Any]) -> dict[str, Any]:
     ''' Get the status of a the transformation job for a certain resource.
@@ -164,7 +148,6 @@ def get_actions():
     actions={
         'csvwmapandtransform_find_mappings': csvwmapandtransform_find_mappings,
         'csvwmapandtransform_transform': csvwmapandtransform_transform,
-        'csvwmapandtransform_map': csvwmapandtransform_map,
         'csvwmapandtransform_test_mappings': csvwmapandtransform_test_mappings,
         'csvwmapandtransform_transform_status': csvwmapandtransform_transform_status,
         'csvwmapandtransform_hook': csvwmapandtransform_hook

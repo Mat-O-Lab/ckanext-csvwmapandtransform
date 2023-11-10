@@ -118,17 +118,18 @@ def iframe_maptomethod(id,resource_id):
     resource_dict = toolkit.get_action('resource_show')(
             {}, {'id': resource_id})
 
-    log.debug(request.values)
+    #log.debug(request.values)
     data= {
         'data_url': resource_dict['url'],
         'method_url': 'https://github.com/Mat-O-Lab/MSEO/raw/main/methods/DIN_EN_ISO_527-3.drawio.ttl',
         'advanced-data_subject_super_class_uris-0': 'http://www.w3.org/ns/csvw#Column',
-        'advanced-data_subject_super_class_uris-1': '',
+        'advanced-data_subject_super_class_uris-1': 'http://www.w3.org/ns/oa#Annotation',
         'advanced-data_mapping_predicate_uri': 'http://purl.obolibrary.org/obo/RO_0010002',
         'advanced-method_object_super_class_uris-0': 'https://spec.industrialontologies.org/ontology/core/Core/InformationContentEntity',
         'advanced-method_object_super_class_uris-1': 'http://purl.obolibrary.org/obo/BFO_0000008',
     }
     html=requests.post(url=MAPTOMETHOD_URL+"/create_mapper", headers=headers, data=json.dumps(data))
+    #html=requests.post(url="http://docker-dev.iwm.fraunhofer.de:6002"+"/create_mapper", headers=headers, data=json.dumps(data))
     html.raise_for_status()
     result=html.text
     #log.debug('Response from MapToMethod: {}'.format(result))
