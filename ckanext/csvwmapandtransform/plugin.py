@@ -7,8 +7,7 @@ from ckan.lib.plugins import DefaultTranslation
 from ckan.types import Context
 from typing import Any
 
-from ckanext.csvwmapandtransform import action, helpers
-import ckanext.csvwmapandtransform.views as views
+from ckanext.csvwmapandtransform import action, helpers, auth, views
 
 log = __import__("logging").getLogger(__name__)
 
@@ -32,7 +31,7 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     plugins.implements(plugins.IResourceUrlChange)
     plugins.implements(plugins.IResourceController, inherit=True)
     plugins.implements(plugins.IActions)
-    # plugins.implements(plugins.IAuthFunctions)
+    plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IBlueprint)
     
 
@@ -115,4 +114,9 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
 
     def get_blueprint(self):
         return views.get_blueprint()
+
+    # IAuthFunctions
+
+    def get_auth_functions(self):
+        return auth.get_auth_functions()
 

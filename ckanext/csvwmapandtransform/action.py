@@ -1,13 +1,12 @@
 from ckan.types import Context
 from ckan.lib.jobs import DEFAULT_QUEUE_NAME
+from ckan import model
 from typing import Any
-import re
 import json
 
 from ckanext.csvwmapandtransform import mapper, db
 from ckanext.csvwmapandtransform.tasks import transform
 
-from flask import render_template
 import ckan.plugins.toolkit as toolkit
 import ckanapi
 import itertools
@@ -15,7 +14,6 @@ import datetime
 from dateutil.parser import parse as parse_date
 from dateutil.parser import isoparse as parse_iso_date
 import sqlalchemy as sa
-import requests
 import os
 
 log = __import__("logging").getLogger(__name__)
@@ -26,22 +24,6 @@ JOB_TIMEOUT = 180
 
 CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 
-
-# @toolkit.chained_action  # requires CKAN 2.7+
-# def datastore_create(original_action, context, data_dict):
-#     #     # This gets called when xloader or datapusher loads a new resource or
-#     #     # data dictionary is changed. We need to regenerate the zip when the latter
-#     #     # happens, and it's ok if it happens at the other times too.
-#     result = original_action(context, data_dict)
-#     #     if 'resource_id' in data_dict:
-#     #         res = model.Resource.get(data_dict['resource_id'])
-#     #         #datapusher finished if True
-#     #         datapush_finished=result.get('calculate_record_count',False)
-#     #         if res and ('CSV' in res.format) and datapush_finished:
-#     #             dataset = res.related_packages()[0]
-#     #             log.debug('chained_action: enquery annotation job')
-#     #             #plugin.enqueue_csvw_annotate(res.id, res.name, res.url, dataset.id, 'datastore_create')
-#     return result
 
 def csvwmapandtransform_find_mappings(context: Context, data_dict):
     groups=toolkit.get_action("group_list")({}, {})
@@ -80,7 +62,7 @@ def csvwmapandtransform_transform(
     :type resource_id: string
     '''
 
-    #toolkit.check_access('csvwmapandtransform_transform_status', context, data_dict)
+    toolkit.check_access('csvwmapandtransform_transform', context, data_dict)
 
     if 'id' in data_dict:
         data_dict['resource_id'] = data_dict['id']
@@ -103,13 +85,13 @@ def csvwmapandtransform_transform_status(
         datapusher status for.
     :type resource_id: string
     '''
-    #toolkit.check_access('csvwmapandtransform_transform_status', context, data_dict)
+    toolkit.check_access('csvwmapandtransform_transform_status', context, data_dict)
     
     if 'id' in data_dict:
         data_dict['resource_id'] = data_dict['id']
     res_id = toolkit.get_or_bust(data_dict, 'resource_id')
     job_id=None
-    #toolkit.check_access('xloader_status', context, data_dict)
+    
     try:
         task = toolkit.get_action('task_status_show')({}, { 'entity_id': res_id,'task_type': 'csvwmapandtransform', 'key': 'csvwmapandtransform'})
     except:
@@ -256,8 +238,7 @@ def enqueue_transform(res_id, res_name, res_url, dataset_id, operation):
     task['state'] = 'pending'
     task['last_updated'] = str(datetime.datetime.utcnow())
     toolkit.get_action('task_status_update')(
-        # {'session': model.meta.create_local_session(), 'ignore_auth': True},
-        {'ignore_auth': True},        
+        {'session': model.meta.create_local_session(), 'ignore_auth': True},
         task
     )
     return True
