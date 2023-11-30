@@ -1,4 +1,4 @@
-import re
+import re, os
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
@@ -11,17 +11,19 @@ from ckanext.csvwmapandtransform import action, helpers, auth, views
 
 log = __import__("logging").getLogger(__name__)
 
-DEFAULT_FORMATS = [
-    "json",
-    "json-ld",
-    "turtle",
-    "n3",
-    "nt",
-    "hext",
-    "trig",
-    "longturtle",
-    "xml"
-]
+DEFAULT_FORMATS = os.environ.get("CSVWMAPANDTRANSFORM_FORMATS","").lower().split()
+if not DEFAULT_FORMATS:
+    DEFAULT_FORMATS = [
+        "json",
+        "json-ld",
+        "turtle",
+        "n3",
+        "nt",
+        "hext",
+        "trig",
+        "longturtle",
+        "xml"
+    ]
 
 
 class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):

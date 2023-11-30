@@ -24,6 +24,15 @@ MAPPER_PORT=4000
 CONVERTER_PORT=5000
 ```
 
+You can set the default formats to run trusformation on by setting the env variable CSVWMAPANDTRANSFORM_FORMATS for example
+```bash
+CSVWMAPANDTRANSFORM_FORMATS="json-ld turtle n3 nt hext trig longturtle xml"
+```
+else it will react to the following  formats: "json json-ld turtle n3 nt hext trig longturtle xml"
+
+
+CSVWMAPANDTRANSFORM_FORMATS="json json-ld turtle n3 nt hext trig longturtle xml"
+
 **TODO:** For example, you might want to mention here which versions of CKAN this
 extension works with.
 

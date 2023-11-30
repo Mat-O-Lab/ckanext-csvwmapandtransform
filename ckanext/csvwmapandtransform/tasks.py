@@ -92,7 +92,7 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
     sorted_list = sorted(res, key=lambda x: x['rating'])
     logger.info("Rated mappings: {}".format(sorted_list))
     #best cnadidate is sorted_list[0]
-    if sorted_list:
+    if sorted_list and sorted_list[0]['rating']>0:
         best_condidate=sorted_list[0]['mapping']
     else:
         best_condidate=None
