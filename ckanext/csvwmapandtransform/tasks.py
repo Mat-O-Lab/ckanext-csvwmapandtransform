@@ -89,7 +89,7 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
             #the more rules can be applied and the more are not skipped the better the mapping
             item['rating']=item['test']['rules_applicable']-item['test']['rules_skipped']
     #sort by rating
-    sorted_list = sorted(res, key=lambda x: x['rating'])
+    sorted_list = sorted(res, key=lambda x: x['rating'],reverse=True)
     logger.info("Rated mappings: {}".format(sorted_list))
     #best cnadidate is sorted_list[0]
     if sorted_list and sorted_list[0]['rating']>0:
