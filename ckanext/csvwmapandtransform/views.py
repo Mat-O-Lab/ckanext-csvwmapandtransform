@@ -7,8 +7,7 @@ import os
 import requests
 import json
 CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
-MAPTOMETHOD_URL = os.environ.get("CKAN_SITE_URL")+":"+os.environ.get("MAPTOMETHOD_APP_PORT")
-
+MAPTOMETHOD_URL = os.environ.get("CKAN_MAPTOMETHOD_URL")
 
 log = __import__("logging").getLogger(__name__)
 
