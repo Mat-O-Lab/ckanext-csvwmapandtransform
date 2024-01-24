@@ -119,7 +119,7 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
                 # url='dummy-value',
                 upload=upload,
                 name=filename,
-                format="turtle",
+                format="text/turtle; charset=utf-8",
             )
             if not ressouce_existing:
                 logger.info("Writing new resource {} to dataset {}".format(filename,dataset_id))
