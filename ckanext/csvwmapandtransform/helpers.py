@@ -4,6 +4,8 @@
 from typing import Any
 import ckan.plugins.toolkit as toolkit
 
+import re
+
 def csvwmapandtransform__status_description(status: dict[str, Any]):
     _ = toolkit._
 
@@ -19,9 +21,13 @@ def csvwmapandtransform__status_description(status: dict[str, Any]):
     else:
         return _('Not Uploaded Yet')
 
+def common_member(a, b):
+    return any(i in b for i in a)
+
 def csvwmapandtransform_show_tools(resource):
     from ckanext.csvwmapandtransform.plugin import DEFAULT_FORMATS
-    if resource['format'].lower() in DEFAULT_FORMATS and"-joined" not in resource['url']:
+    format_parts=re.split('/|;', resource['format'].lower().replace(' ',''))
+    if common_member(format_parts,DEFAULT_FORMATS):
         return True
     else:
         False

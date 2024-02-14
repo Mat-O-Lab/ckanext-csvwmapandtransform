@@ -15,14 +15,16 @@ DEFAULT_FORMATS = os.environ.get("CSVWMAPANDTRANSFORM_FORMATS","").lower().split
 if not DEFAULT_FORMATS:
     DEFAULT_FORMATS = [
         "json",
-        "json-ld",
         "turtle",
+        "text/turtle"
         "n3",
         "nt",
         "hext",
         "trig",
         "longturtle",
-        "xml"
+        "xml",
+        "json-ld",
+        "ld+json"
     ]
 
 
