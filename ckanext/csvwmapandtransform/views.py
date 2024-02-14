@@ -43,7 +43,7 @@ class TransformView(MethodView):
             toolkit.g.resource = resource
 
         except (toolkit.ObjectNotFound, toolkit.NotAuthorized):
-            base.abort(404, _('Resource not found'))
+            base.abort(404, 'Resource not found')
         status=toolkit.get_action('csvwmapandtransform_transform_status')(
             {}, {
                         'resource_id': resource_id
@@ -88,7 +88,7 @@ class CreateMapView(MethodView):
             toolkit.g.resource = resource
 
         except (toolkit.ObjectNotFound, toolkit.NotAuthorized):
-            base.abort(404, _('Resource not found'))
+            base.abort(404, 'Resource not found')
         # iframe_url = toolkit.url_for(
         #     "api.action",
         #     ver=3,
