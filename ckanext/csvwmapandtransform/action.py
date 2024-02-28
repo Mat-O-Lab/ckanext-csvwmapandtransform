@@ -17,7 +17,7 @@ import sqlalchemy as sa
 import os
 
 log = __import__("logging").getLogger(__name__)
-#must be lower case alphanumeric and these symbols: -_
+# must be lower case alphanumeric and these symbols: -_
 MAPPING_GROUP = "mappings"
 METHOD_GROUP = "methods"
 JOB_TIMEOUT = 180
@@ -26,113 +26,139 @@ CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 
 
 def csvwmapandtransform_find_mappings(context: Context, data_dict):
-    groups=toolkit.get_action("group_list")({}, {})
+    groups = toolkit.get_action("group_list")({}, {})
     if MAPPING_GROUP in groups:
-        mapping_group=toolkit.get_action("group_show")({},{"id": MAPPING_GROUP, "include_datasets": True})
+        mapping_group = toolkit.get_action("group_show")(
+            {}, {"id": MAPPING_GROUP, "include_datasets": True}
+        )
     else:
-        mapping_group=create_group(MAPPING_GROUP)
-    packages=mapping_group.get('packages',None)
+        mapping_group = create_group(MAPPING_GROUP)
+    packages = mapping_group.get("packages", None)
     if packages:
-        packages=[ toolkit.get_action("package_show")({},{"id": package['id']}) for package in packages]
-        resources=list(itertools.chain.from_iterable([ package['resources'] for package in packages]))
+        packages = [
+            toolkit.get_action("package_show")({}, {"id": package["id"]})
+            for package in packages
+        ]
+        resources = list(
+            itertools.chain.from_iterable(
+                [package["resources"] for package in packages]
+            )
+        )
     else:
-        resources=list()
+        resources = list()
     return resources
 
 
 def csvwmapandtransform_test_mappings(context: Context, data_dict):
-    data_url=data_dict.get('data_url',None)
-    map_urls=data_dict.get('map_urls',None)
+    data_url = data_dict.get("data_url", None)
+    map_urls = data_dict.get("map_urls", None)
     if not map_urls:
-        msg = {'map_urls': ['this field is mandatory.']}
+        msg = {"map_urls": ["this field is mandatory."]}
         raise toolkit.ValidationError(msg)
     elif not data_url:
-        msg = {'data_url': ['this field is mandatory.']}
+        msg = {"data_url": ["this field is mandatory."]}
         raise toolkit.ValidationError(msg)
-    tests=[mapper.check_mapping(map_url=url, data_url=data_url) for url in map_urls]
+    tests = [mapper.check_mapping(map_url=url, data_url=data_url) for url in map_urls]
     return tests
 
 
 def csvwmapandtransform_transform(
-    context: Context, data_dict: dict[str, Any]) -> dict[str, Any]:
-    ''' Start a the transformation job for a certain resource.
+    context: Context, data_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Start a the transformation job for a certain resource.
 
     :param resource_id: The resource id of the resource that you want the
         datapusher status for.
     :type resource_id: string
-    '''
+    """
+    if "id" in data_dict:
+        data_dict["resource_id"] = data_dict["id"]
+    res_id = toolkit.get_or_bust(data_dict, "resource_id")
+    resource = toolkit.get_action("resource_show")(
+        {"ignore_auth": True}, {"id": res_id}
+    )
+    data_dict["resource"] = resource
+    toolkit.check_access("csvwmapandtransform_transform", context, data_dict)
 
-    toolkit.check_access('csvwmapandtransform_transform', context, data_dict)
-
-    if 'id' in data_dict:
-        data_dict['resource_id'] = data_dict['id']
-    res_id = toolkit.get_or_bust(data_dict, 'resource_id')
-    resource = toolkit.get_action(u'resource_show'
-                                          )({"ignore_auth": True}, {
-                                              u'id': res_id
-                                          })
-    log.debug('transform_started for: {}'.format(resource))
-    res=enqueue_transform(resource['id'], resource['name'], resource['url'], resource['package_id'], operation='changed')
+    log.debug("transform_started for: {}".format(resource))
+    res = enqueue_transform(
+        resource["id"],
+        resource["name"],
+        resource["url"],
+        resource["package_id"],
+        operation="changed",
+    )
     return res
 
 
 @toolkit.side_effect_free
 def csvwmapandtransform_transform_status(
-        context: Context, data_dict: dict[str, Any]) -> dict[str, Any]:
-    ''' Get the status of a the transformation job for a certain resource.
+    context: Context, data_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Get the status of a the transformation job for a certain resource.
 
     :param resource_id: The resource id of the resource that you want the
         datapusher status for.
     :type resource_id: string
-    '''
-    toolkit.check_access('csvwmapandtransform_transform_status', context, data_dict)
-    
-    if 'id' in data_dict:
-        data_dict['resource_id'] = data_dict['id']
-    res_id = toolkit.get_or_bust(data_dict, 'resource_id')
-    job_id=None
-    
+    """
+    toolkit.check_access("csvwmapandtransform_transform_status", context, data_dict)
+
+    if "id" in data_dict:
+        data_dict["resource_id"] = data_dict["id"]
+    res_id = toolkit.get_or_bust(data_dict, "resource_id")
+    job_id = None
+
     try:
-        task = toolkit.get_action('task_status_show')({}, { 'entity_id': res_id,'task_type': 'csvwmapandtransform', 'key': 'csvwmapandtransform'})
+        task = toolkit.get_action("task_status_show")(
+            {},
+            {
+                "entity_id": res_id,
+                "task_type": "csvwmapandtransform",
+                "key": "csvwmapandtransform",
+            },
+        )
     except:
-        status=None
+        status = None
     else:
-        value = json.loads(task['value'])
-        job_id = value.get('job_id')
+        value = json.loads(task["value"])
+        job_id = value.get("job_id")
         url = None
         job_detail = None
         try:
-            error = json.loads(task['error'])
+            error = json.loads(task["error"])
         except ValueError:
             # this happens occasionally, such as when the job times out
-            error = task['error']
-        status={
-            'status': task['state'],
-            'job_id': job_id,
-            'job_url': url,
-            'last_updated': task['last_updated'],
-            'error': error,
+            error = task["error"]
+        status = {
+            "status": task["state"],
+            "job_id": job_id,
+            "job_url": url,
+            "last_updated": task["last_updated"],
+            "error": error,
         }
-    if job_id:  
-        #get logs from db
+    if job_id:
+        # get logs from db
         db.init()
         db_job = db.get_job(job_id)
 
-        if db_job and db_job.get('logs'):
-            for log in db_job['logs']:
-                if 'timestamp' in log and isinstance(log['timestamp'], datetime.datetime):
-                    log['timestamp'] = log['timestamp'].isoformat()
-        status=dict(status, **db_job)
-        #status['task_info']=db_job
+        if db_job and db_job.get("logs"):
+            for log in db_job["logs"]:
+                if "timestamp" in log and isinstance(
+                    log["timestamp"], datetime.datetime
+                ):
+                    log["timestamp"] = log["timestamp"].isoformat()
+        status = dict(status, **db_job)
+        # status['task_info']=db_job
     return status
 
+
 def get_actions():
-    actions={
-        'csvwmapandtransform_find_mappings': csvwmapandtransform_find_mappings,
-        'csvwmapandtransform_transform': csvwmapandtransform_transform,
-        'csvwmapandtransform_test_mappings': csvwmapandtransform_test_mappings,
-        'csvwmapandtransform_transform_status': csvwmapandtransform_transform_status,
-        'csvwmapandtransform_hook': csvwmapandtransform_hook
+    actions = {
+        "csvwmapandtransform_find_mappings": csvwmapandtransform_find_mappings,
+        "csvwmapandtransform_transform": csvwmapandtransform_transform,
+        "csvwmapandtransform_test_mappings": csvwmapandtransform_test_mappings,
+        "csvwmapandtransform_transform_status": csvwmapandtransform_transform_status,
+        "csvwmapandtransform_hook": csvwmapandtransform_hook,
     }
     return actions
 
@@ -151,33 +177,35 @@ def enqueue_transform(res_id, res_name, res_url, dataset_id, operation):
     # log.debug(jobs)
     # Check if this resource is already in the process of being xloadered
     task = {
-        'entity_id': res_id,
-        'entity_type': 'resource',
-        'task_type': 'csvwmapandtransform',
-        'last_updated': str(datetime.datetime.utcnow()),
-        'state': 'submitting',
-        'key': 'csvwmapandtransform',
-        'value': '{}',
-        'error': '{}',
-        'detail': "",
+        "entity_id": res_id,
+        "entity_type": "resource",
+        "task_type": "csvwmapandtransform",
+        "last_updated": str(datetime.datetime.utcnow()),
+        "state": "submitting",
+        "key": "csvwmapandtransform",
+        "value": "{}",
+        "error": "{}",
+        "detail": "",
     }
     try:
-        existing_task = toolkit.get_action('task_status_show')({}, {
-            'entity_id': res_id,
-            'task_type': 'csvwmapandtransform',
-            'key': 'csvwmapandtransform'
-        })
+        existing_task = toolkit.get_action("task_status_show")(
+            {},
+            {
+                "entity_id": res_id,
+                "task_type": "csvwmapandtransform",
+                "key": "csvwmapandtransform",
+            },
+        )
         assume_task_stale_after = datetime.timedelta(seconds=3600)
-        assume_task_stillborn_after = \
-            datetime.timedelta(seconds=int(5))
-        if existing_task.get('state') == 'pending':
+        assume_task_stillborn_after = datetime.timedelta(seconds=int(5))
+        if existing_task.get("state") == "pending":
             # queued_res_ids = [
             #     re.search(r"'resource_id': u?'([^']+)'",
             #               job.description).groups()[0]
             #     for job in get_queue().get_jobs()
             #     if 'xloader_to_datastore' in str(job)  # filter out test_job etc
             # ]
-            updated = parse_iso_date(existing_task['last_updated'])
+            updated = parse_iso_date(existing_task["last_updated"])
             time_since_last_updated = datetime.datetime.utcnow() - updated
             # if (res_id not in queued_res_ids
             #         and time_since_last_updated > assume_task_stillborn_after):
@@ -194,57 +222,59 @@ def enqueue_transform(res_id, res_name, res_url, dataset_id, operation):
                 # it's been a while since the job was last updated - it's more
                 # likely something went wrong with it and the state wasn't
                 # updated than its still in progress. Let it be restarted.
-                log.info('A pending task was found %r, but it is only %s hours'
-                         ' old', existing_task['id'], time_since_last_updated)
+                log.info(
+                    "A pending task was found %r, but it is only %s hours" " old",
+                    existing_task["id"],
+                    time_since_last_updated,
+                )
             else:
-                log.info('A pending task was found %s for this resource, so '
-                         'skipping this duplicate task', existing_task['id'])
+                log.info(
+                    "A pending task was found %s for this resource, so "
+                    "skipping this duplicate task",
+                    existing_task["id"],
+                )
                 return False
 
-        task['id'] = existing_task['id']
+        task["id"] = existing_task["id"]
     except toolkit.ObjectNotFound:
         pass
-    
+
     callback_url = toolkit.url_for(
-        "api.action",
-        ver=3,
-        logic_function="csvwmapandtransform_hook",
-        qualified=True
+        "api.action", ver=3, logic_function="csvwmapandtransform_hook", qualified=True
     )
-    #initioalize database for additional job data
+    # initioalize database for additional job data
     db.init()
     # Store details of the job in the db
-    
+
     # add this dataset to the queue
-    job=toolkit.enqueue_job(
+    job = toolkit.enqueue_job(
         transform,
-        [res_url, res_id, dataset_id,callback_url,task['last_updated']],
+        [res_url, res_id, dataset_id, callback_url, task["last_updated"]],
         title='csvwmapandtransform {} "{}" {}'.format(operation, res_name, res_url),
-        queue=queue#, timeout=JOB_TIMEOUT
+        queue=queue,  # , timeout=JOB_TIMEOUT
     )
     try:
-        db.add_pending_job(job.id, job_type=task['task_type'],result_url=callback_url)
+        db.add_pending_job(job.id, job_type=task["task_type"], result_url=callback_url)
     except sa.exc.IntegrityError:
-        raise Exception('job_id {} already exists'.format(task['id']))
-    
-    
+        raise Exception("job_id {} already exists".format(task["id"]))
+
     # log.info("added a job to csvwmapandtransform database")
-    #log.debug("enqueued job id".format(job.id)
-    
+    # log.debug("enqueued job id".format(job.id)
+
     log.debug("Enqueued job {} to {} resource {}".format(job.id, operation, res_name))
 
-    value = json.dumps({'job_id': job.id})
-    task['value'] = value
-    task['state'] = 'pending'
-    task['last_updated'] = str(datetime.datetime.utcnow())
-    toolkit.get_action('task_status_update')(
-        {'session': model.meta.create_local_session(), 'ignore_auth': True},
-        task
+    value = json.dumps({"job_id": job.id})
+    task["value"] = value
+    task["state"] = "pending"
+    task["last_updated"] = str(datetime.datetime.utcnow())
+    toolkit.get_action("task_status_update")(
+        {"session": model.meta.create_local_session(), "ignore_auth": True}, task
     )
     return True
 
+
 def csvwmapandtransform_hook(context, data_dict):
-    ''' Update csvwmapandtransform task. This action is typically called by ckanext-csvwmapandtransform
+    """Update csvwmapandtransform task. This action is typically called by ckanext-csvwmapandtransform
     whenever the status of a job changes.
 
     :param metadata: metadata provided when submitting job. key-value pairs.
@@ -272,36 +302,41 @@ def csvwmapandtransform_hook(context, data_dict):
         :param finished_timestamp: Time the job finished
         :type finished_timestamp: timestamp
 
-    '''
+    """
 
-    metadata, status, job_info = toolkit.get_or_bust(data_dict, ['metadata', 'status', 'job_info'])
+    metadata, status, job_info = toolkit.get_or_bust(
+        data_dict, ["metadata", "status", "job_info"]
+    )
 
-    res_id = toolkit.get_or_bust(metadata, 'resource_id')
+    res_id = toolkit.get_or_bust(metadata, "resource_id")
 
     # Pass metadata, not data_dict, as it contains the resource id needed
     # on the auth checks
-    #toolkit.check_access('xloader_submit', context, metadata)
+    # toolkit.check_access('xloader_submit', context, metadata)
 
-    task = toolkit.get_action('task_status_show')(context, {
-        'entity_id': res_id,
-        'task_type': 'csvwmapandtransform',
-        'key': 'csvwmapandtransform'
-    })
+    task = toolkit.get_action("task_status_show")(
+        context,
+        {
+            "entity_id": res_id,
+            "task_type": "csvwmapandtransform",
+            "key": "csvwmapandtransform",
+        },
+    )
 
-    task['state'] = status
-    task['last_updated'] = str(datetime.datetime.utcnow())
-    task['error'] = data_dict.get('error')
-    #task['task_info'] = job_info
+    task["state"] = status
+    task["last_updated"] = str(datetime.datetime.utcnow())
+    task["error"] = data_dict.get("error")
+    # task['task_info'] = job_info
     resubmit = False
 
-    if status in ('complete', 'running_but_viewable'):
+    if status in ("complete", "running_but_viewable"):
         # Create default views for resource if necessary (only the ones that
         # require data to be in the DataStore)
-        resource_dict = toolkit.get_action('resource_show')(
-            context, {'id': res_id})
+        resource_dict = toolkit.get_action("resource_show")(context, {"id": res_id})
 
-        dataset_dict = toolkit.get_action('package_show')(
-            context, {'id': resource_dict['package_id']})
+        dataset_dict = toolkit.get_action("package_show")(
+            context, {"id": resource_dict["package_id"]}
+        )
 
         # for plugin in p.PluginImplementations(xloader_interfaces.IXloader):
         #     plugin.after_upload(context, resource_dict, dataset_dict)
@@ -315,42 +350,49 @@ def csvwmapandtransform_hook(context, data_dict):
         #     })
 
         # Check if the uploaded file has been modified in the meantime
-        if (resource_dict.get('last_modified')
-                and metadata.get('task_created')):
+        if resource_dict.get("last_modified") and metadata.get("task_created"):
             try:
-                last_modified_datetime = parse_date(
-                    resource_dict['last_modified'])
-                task_created_datetime = parse_date(metadata['task_created'])
+                last_modified_datetime = parse_date(resource_dict["last_modified"])
+                task_created_datetime = parse_date(metadata["task_created"])
                 if last_modified_datetime > task_created_datetime:
-                    log.debug('Uploaded file more recent: %s > %s',
-                              last_modified_datetime, task_created_datetime)
+                    log.debug(
+                        "Uploaded file more recent: %s > %s",
+                        last_modified_datetime,
+                        task_created_datetime,
+                    )
                     resubmit = True
             except ValueError:
                 pass
         # Check if the URL of the file has been modified in the meantime
-        elif (resource_dict.get('url')
-              and metadata.get('original_url')
-              and resource_dict['url'] != metadata['original_url']):
-            log.debug('URLs are different: %s != %s',
-                      resource_dict['url'], metadata['original_url'])
+        elif (
+            resource_dict.get("url")
+            and metadata.get("original_url")
+            and resource_dict["url"] != metadata["original_url"]
+        ):
+            log.debug(
+                "URLs are different: %s != %s",
+                resource_dict["url"],
+                metadata["original_url"],
+            )
             resubmit = True
-        #mark job completed in db
+        # mark job completed in db
         log.debug(task)
         log.debug(job_info)
 
         if status == "complete":
             log.debug("job complete now update job db at: {}".format(task))
             db.init()
-            job_id=json.loads(task['value'])['job_id']
+            job_id = json.loads(task["value"])["job_id"]
             db.mark_job_as_completed(job_id)
-        
 
-    context['ignore_auth'] = True
-    toolkit.get_action('task_status_update')(context, task)
+    context["ignore_auth"] = True
+    toolkit.get_action("task_status_update")(context, task)
 
     if resubmit:
-        log.debug('Resource %s has been modified, '
-                  'resubmitting to csvwmapandtransform', res_id)
-        toolkit.get_action('csvwmapandtransform_transform')(
-            context, {'resource_id': res_id})
-
+        log.debug(
+            "Resource %s has been modified, " "resubmitting to csvwmapandtransform",
+            res_id,
+        )
+        toolkit.get_action("csvwmapandtransform_transform")(
+            context, {"resource_id": res_id}
+        )
