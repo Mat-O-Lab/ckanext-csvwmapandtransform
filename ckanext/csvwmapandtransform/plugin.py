@@ -11,20 +11,19 @@ from ckanext.csvwmapandtransform import action, helpers, auth, views
 
 log = __import__("logging").getLogger(__name__)
 
-DEFAULT_FORMATS = os.environ.get("CSVWMAPANDTRANSFORM_FORMATS","").lower().split()
+DEFAULT_FORMATS = os.environ.get("CSVWMAPANDTRANSFORM_FORMATS", "").lower().split()
 if not DEFAULT_FORMATS:
     DEFAULT_FORMATS = [
         "json",
         "turtle",
-        "text/turtle"
-        "n3",
+        "text/turtle" "n3",
         "nt",
         "hext",
         "trig",
         "longturtle",
         "xml",
         "json-ld",
-        "ld+json"
+        "ld+json",
     ]
 
 
@@ -37,7 +36,6 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     plugins.implements(plugins.IActions)
     plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IBlueprint)
-    
 
     # IConfigurer
 
@@ -49,60 +47,64 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     # IResourceUrlChange
 
     def notify(self, resource: model.Resource):
-        context: Context = {'ignore_auth': True}
-        resource_dict = toolkit.get_action(u'resource_show')(
-            context, {
-                u'id': resource.id,
-            }
+        context: Context = {"ignore_auth": True}
+        resource_dict = toolkit.get_action("resource_show")(
+            context,
+            {
+                "id": resource.id,
+            },
         )
         self._sumbit_transform(resource_dict)
 
     # IResourceController
 
-    def after_resource_create(
-            self, context: Context, resource_dict: dict[str, Any]):
+    if not toolkit.check_ckan_version("2.10"):
 
+        def after_create(self, context, resource_dict):
+            self.after_resource_create(context, resource_dict)
+
+        # def before_show(self, resource_dict):
+        #     self.before_resource_show(resource_dict)
+
+        def after_update(self, context: Context, resource_dict: dict[str, Any]):
+            self._sumbit_transform(resource_dict)
+
+    def after_resource_create(self, context: Context, resource_dict: dict[str, Any]):
         self._sumbit_transform(resource_dict)
 
-    def after_update(
-            self, context: Context, resource_dict: dict[str, Any]):
-
-        self._sumbit_transform(resource_dict)
-
-    
     def _sumbit_transform(self, resource_dict: dict[str, Any]):
-        context = {
-            u'model': model,
-            u'ignore_auth': True,
-            u'defer_commit': True
-        }
-        format=resource_dict.get('format',None)
+        context = {"model": model, "ignore_auth": True, "defer_commit": True}
+        format = resource_dict.get("format", None)
         submit = (
             format
-            and format.lower() in DEFAULT_FORMATS and "-joined" not in resource_dict['url']
+            and format.lower() in DEFAULT_FORMATS
+            and "-joined" not in resource_dict["url"]
         )
         log.debug(
-                u'Submitting resource {0} with format {1}'.format(resource_dict['id'],format) +
-                u' to csvwmapandtransform_transform'
+            "Submitting resource {0} with format {1}".format(
+                resource_dict["id"], format
             )
-        
+            + " to csvwmapandtransform_transform"
+        )
+
         if not submit:
             return
-            
+
         try:
             log.debug(
-                u'Submitting resource {0}'.format(resource_dict['id']) +
-                u' to csvwmapandtransform_transform'
+                "Submitting resource {0}".format(resource_dict["id"])
+                + " to csvwmapandtransform_transform"
             )
-            toolkit.get_action('csvwmapandtransform_transform')(context,{'id': resource_dict['id']})
-             
+            toolkit.get_action("csvwmapandtransform_transform")(
+                context, {"id": resource_dict["id"]}
+            )
+
         except toolkit.ValidationError as e:
             # If RDFConverter is offline want to catch error instead
             # of raising otherwise resource save will fail with 500
             log.critical(e)
             pass
 
-    
     # ITemplateHelpers
 
     def get_helpers(self):
@@ -113,7 +115,7 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     def get_actions(self):
         actions = action.get_actions()
         return actions
-    
+
     # IBlueprint
 
     def get_blueprint(self):
@@ -123,4 +125,3 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
 
     def get_auth_functions(self):
         return auth.get_auth_functions()
-

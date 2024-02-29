@@ -338,17 +338,6 @@ def csvwmapandtransform_hook(context, data_dict):
             context, {"id": resource_dict["package_id"]}
         )
 
-        # for plugin in p.PluginImplementations(xloader_interfaces.IXloader):
-        #     plugin.after_upload(context, resource_dict, dataset_dict)
-
-        # toolkit.get_action('resource_create_default_resource_views')(
-        #     context,
-        #     {
-        #         'resource': resource_dict,
-        #         'package': dataset_dict,
-        #         'create_datastore_views': True,
-        #     })
-
         # Check if the uploaded file has been modified in the meantime
         if resource_dict.get("last_modified") and metadata.get("task_created"):
             try:
