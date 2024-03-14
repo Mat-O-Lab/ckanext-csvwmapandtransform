@@ -3,6 +3,7 @@ import re, os
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 from ckan import model
+from ckan.lib.plugins import DefaultTranslation
 
 if toolkit.check_ckan_version("2.10"):
     from ckan.types import Context
@@ -12,8 +13,6 @@ else:
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
 
-
-from ckan.lib.plugins import DefaultTranslation
 
 from typing import Any
 
@@ -57,7 +56,7 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     # IResourceUrlChange
 
     def notify(self, resource: model.Resource):
-        context: {"ignore_auth": True}
+        context: Context = {"ignore_auth": True}
         resource_dict = toolkit.get_action("resource_show")(
             context,
             {
@@ -76,10 +75,10 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
         # def before_show(self, resource_dict):
         #     self.before_resource_show(resource_dict)
 
-        def after_update(self, context, resource_dict: dict[str, Any]):
+        def after_update(self, context: Context, resource_dict: dict[str, Any]):
             self._sumbit_transform(resource_dict)
 
-    def after_resource_create(self, context, resource_dict: dict[str, Any]):
+    def after_resource_create(self, context: Context, resource_dict: dict[str, Any]):
         self._sumbit_transform(resource_dict)
 
     def _sumbit_transform(self, resource_dict: dict[str, Any]):
