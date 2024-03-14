@@ -1,3 +1,5 @@
+import ckan.plugins.toolkit as toolkit
+
 if toolkit.check_ckan_version("2.10"):
     from ckan.types import Context
 else:
@@ -15,7 +17,6 @@ import json
 from ckanext.csvwmapandtransform import mapper, db
 from ckanext.csvwmapandtransform.tasks import transform
 
-import ckan.plugins.toolkit as toolkit
 import ckanapi
 import itertools
 import datetime
