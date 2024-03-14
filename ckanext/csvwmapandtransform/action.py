@@ -1,4 +1,12 @@
-from ckan.types import Context
+if toolkit.check_ckan_version("2.10"):
+    from ckan.types import Context
+else:
+
+    class Context(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+
 from ckan.lib.jobs import DEFAULT_QUEUE_NAME
 from ckan import model
 from typing import Any
