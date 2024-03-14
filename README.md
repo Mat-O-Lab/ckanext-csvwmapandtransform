@@ -1,4 +1,4 @@
-[![Tests](https://github.com/Mat-O-Lab/ckanext-csvwmapandtransform/workflows/Tests/badge.svg?branch=main)](https://github.com/Mat-O-Lab/ckanext-csvwmapandtransform/actions)
+[![Tests](https://github.com/Mat-O-Lab/ckanext-csvwmapandtransform/actions/workflows/test.yml/badge.svg)](https://github.com/Mat-O-Lab/ckanext-csvwmapandtransform/actions/workflows/test.yml)
 
 # ckanext-csvwmapandtransform
 
