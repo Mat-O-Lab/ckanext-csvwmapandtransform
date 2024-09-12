@@ -35,7 +35,7 @@ CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 
 
 def csvwmapandtransform_find_mappings(context: Context, data_dict):
-    groups = toolkit.get_action("group_list")({}, {})
+    groups = [entry.name for entry in toolkit.get_action("group_list")({}, {"all_fields": True})]
     if MAPPING_GROUP in groups:
         mapping_group = toolkit.get_action("group_show")(
             {}, {"id": MAPPING_GROUP, "include_datasets": True}
