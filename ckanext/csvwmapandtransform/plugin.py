@@ -67,7 +67,7 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
 
     # IResourceController
 
-    if not toolkit.check_ckan_version("2.10"):
+    if not toolkit.check_ckan_version("2.10") or toolkit.check_ckan_version("2.11"):
 
         def after_create(self, context, resource_dict):
             self.after_resource_create(context, resource_dict)
