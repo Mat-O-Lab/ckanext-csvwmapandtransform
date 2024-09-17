@@ -48,7 +48,10 @@ def csvwmapandtransform_find_mappings(context: Context, data_dict):
             {"ignore_auth": True}, {"id": mapping_group_id, "include_datasets": True}
         )
     else:
-        mapping_group = create_group(MAPPING_GROUP)
+        try:
+            mapping_group = create_group(MAPPING_GROUP)
+        except:
+            pass
     packages = mapping_group.get("packages", None)
     log.info(f"mappings=={packages}")
 
