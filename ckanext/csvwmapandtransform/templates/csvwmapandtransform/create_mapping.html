@@ -6,36 +6,46 @@
 {% block breadcrumb_content_selected %}{% endblock %}
 
 {% block breadcrumb_content %}
-  {{ super() }}
-  {% if res %}
-      <li>{% link_for h.resource_display_name(res)|truncate(30), named_route=pkg.type ~ '_resource.read', id=pkg.name, resource_id=res.id %}</li>
-      <li{% block breadcrumb_edit_selected %} class="active"{% endblock %}><a href="">{{ _('Map') }}</a></li>
+{{ super() }}
+{% if res %}
+<li>{% link_for h.resource_display_name(res)|truncate(30), named_route=pkg.type ~ '_resource.read', id=pkg.name,
+  resource_id=res.id %}</li>
+<li{% block breadcrumb_edit_selected %} class="active" {% endblock %}><a href="">{{ _('Map') }}</a></li>
   {% endif %}
-{% endblock %}
-
-{% block content_action %}
-    {% if res %}
-	{% link_for _('View resource'), named_route=pkg.type ~ '_resource.read', id=pkg.name, resource_id=res.id, class_='btn btn-default', icon='eye' %}
-  {% endif %}
-{% endblock %}
-
-{% block content_primary_nav %}
-{% endblock %}
-
-{% block primary_content_inner %}
-  <h1 >{% block form_title %}{{ _('Map resource') }}{% endblock %}</h1>
-  {% block form %}  
   {% endblock %}
-  <iframe class="col-12" name="my-iframe" src="{{iframe_url}}"" onload='javascript:(function(o){o.style.height=o.contentWindow.document.body.scrollHeight+"px";}(this));' style="height:200px;width:100%;border:none;overflow:hidden;"></iframe>
-  
-{% endblock %}
 
-{% block secondary_content %}
+  {% block content_action %}
+  {% if res %}
+  {% link_for _('View resource'), named_route=pkg.type ~ '_resource.read', id=pkg.name, resource_id=res.id, class_='btn
+  btn-default', icon='eye' %}
+  {% endif %}
+  {% endblock %}
+
+  {% block content_primary_nav %}
+  {% endblock %}
+
+  {% block primary_content_inner %}
+  <h1>{% block form_title %}{{ _('Map resource') }}{% endblock %}</h1>
+  <p>Create a rule bases mapping by filling the form below. It will query the given metadata file and the graph template
+    by the Class IRI set for subjects and objects. When clicking "Start Mapping" select widgets will spawn allowing you
+    to map a subject to an object. The resulting YAML file will contain a ruleset for each of the assertions made and
+    when run create triples connecting the subject meeting the condition by the predicate IRI given. Download the file,
+    make changes if needed and upload it to the "mappings" group here in CKAN if you want to make use of the automated
+    mapping process applying the mapping.</p>
+  {% block form %}
+  {% endblock %}
+  <iframe class="col-12" name="my-iframe"
+    src="{{iframe_url}}"" onload='javascript:(function(o){o.style.height=o.contentWindow.document.body.scrollHeight+"
+    px";}(this));' style="height:1100px;width:100%;border:none;overflow:hidden;"></iframe>
+
+  {% endblock %}
+
+  {% block secondary_content %}
   {% snippet 'package/snippets/resource_info.html', res=res %}
   {% snippet 'package/snippets/resources.html', pkg=pkg, active=res.id %}
-{% endblock %}
+  {% endblock %}
 
-{% block scripts %}
+  {% block scripts %}
   {{ super() }}
   <!-- <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -43,4 +53,4 @@
     });
   </script> -->
   {% asset 'vendor/fileupload' %}
-{% endblock %}
+  {% endblock %}

@@ -6,10 +6,11 @@ import ckan.lib.base as base
 import os
 import requests
 import json
+from distutils.util import strtobool
 
 CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 MAPTOMETHOD_URL = os.environ.get("CKAN_MAPTOMETHOD_URL")
-SSL_VERIFY = os.environ.get("CSVWMAPANDTRANSFORM_SSL_VERIFY", True)
+SSL_VERIFY = bool(strtobool(os.environ.get("CSVWMAPANDTRANSFORM_SSL_VERIFY", True)))
 
 log = __import__("logging").getLogger(__name__)
 
@@ -125,6 +126,7 @@ def iframe_maptomethod(id, resource_id):
         "advanced-method_object_super_class_uris-0": "https://spec.industrialontologies.org/ontology/core/Core/InformationContentEntity",
         "advanced-method_object_super_class_uris-1": "http://purl.obolibrary.org/obo/BFO_0000008",
     }
+    log.debug(SSL_VERIFY)
     html = requests.post(
         url=MAPTOMETHOD_URL + "/create_mapper",
         headers=headers,
