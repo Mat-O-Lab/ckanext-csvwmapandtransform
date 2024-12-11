@@ -84,12 +84,14 @@ def transform(res_url, res_id, dataset_id, callback_url, last_updated, skip_if_n
     logger.info("testing mappings with: {}".format(tomap_res['url']))
     # tests=get_action(u'csvwmapandtransform_test_map
     res=[{'mapping': map_url,'test': mapper.check_mapping(map_url=map_url, data_url=tomap_res['url'], authorization=CSVWMAPANDTRANSFORM_TOKEN)} for map_url in mapping_urls]
-    for item in res:
+    #remove None resulting test Items
+    valid_items=[item for item in res if item['test]]
+    for item in valid_items:
         if item['test']:
             #the more rules can be applied and the more are not skipped the better the mapping
             item['rating']=item['test']['rules_applicable']-item['test']['rules_skipped']
     #sort by rating
-    sorted_list = sorted(res, key=lambda x: x['rating'],reverse=True)
+    sorted_list = sorted(valid_items, key=lambda x: x['rating'],reverse=True)
     logger.info("Rated mappings: {}".format(sorted_list))
     #best cnadidate is sorted_list[0]
     if sorted_list and sorted_list[0]['rating']>0:
