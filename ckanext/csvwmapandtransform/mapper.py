@@ -21,7 +21,8 @@ def post_request(url, headers, data, files=None):
 
     except requests.exceptions.RequestException as e:
         # placeholder for save file / clean-up
-        raise SystemExit(e) from None
+        pass
+        #raise SystemExit(e) from None
     return response
 
 # def get_request(url, headers, data, files=None):
