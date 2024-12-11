@@ -38,7 +38,7 @@ def csvwmapandtransform_find_mappings(context: Context, data_dict):
     mapping_group_id = next(
         (
             entry["id"] if entry["name"] == MAPPING_GROUP else None
-            for entry in toolkit.get_action("group_list")({}, {"all_fields": True})
+            for entry in toolkit.get_action("group_list")({}, {})
         ),
         None,
     )
