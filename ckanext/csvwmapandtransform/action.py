@@ -33,16 +33,15 @@ JOB_TIMEOUT = 180
 
 CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 
+def find_first_matching_id(dicts: list, key: str, value: str):
+    return next((d["id"] for d in dicts if d.get(key) == value), None)
 
 def csvwmapandtransform_find_mappings(context: Context, data_dict):
-    mapping_group_id = next(
-        (
-            entry["id"] if entry["name"] == MAPPING_GROUP else None
-            for entry in toolkit.get_action("group_list")({}, {"all_fields": True})
-        ),
-        None,
-    )
-    # log.info(f"groups=={groups}")
+    mapping_group_id = find_first_matching_id(
+            toolkit.get_action("group_list")({}, {"all_fields": True}),
+            key="name",
+            value=MAPPING_GROUP,
+        )
     if mapping_group_id:
         mapping_group = toolkit.get_action("group_show")(
             {"ignore_auth": True}, {"id": mapping_group_id, "include_datasets": True}
