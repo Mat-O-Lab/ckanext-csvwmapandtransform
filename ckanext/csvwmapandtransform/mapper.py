@@ -59,7 +59,7 @@ def check_mapping(map_url: str, data_url: str, authorization: None):
         return res
     else:
         log.debug("map check error: {}".format(r))
-        return r
+        return None
 
 def get_joined_rdf(map_url: str, data_url: str, authorization: None):
     log.debug("createing joined rdf: {} with data url: {}".format(map_url,data_url))
