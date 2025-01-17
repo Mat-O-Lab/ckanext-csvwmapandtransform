@@ -35,7 +35,7 @@
   {% block primary_content_inner %}
   <h1>{% block form_title %}{{ _('Transform Status') }}{% endblock %}</h1>
   {% if status %}
-  <div id="ajax-status" data-module="aiextract">
+  <div id="ajax-status" data-module="csvwmapandtransform" data-api-url="{{ status_url }}">
     {% block form %}
     <form class="add-to-group" method="post">
       {{ h.csrf_input() }}
@@ -45,9 +45,9 @@
                       service_status %}disabled{% endif %}" name="extract/update" type="submit">
             <i class="fa fa-refresh"></i> {{ _('Run Transformation') }}
           </button>
-          <button class="btn btn-danger invisible" name="delete" type="submit">
+          <!-- <button class="btn btn-danger invisible" name="delete" type="submit">
             <i class="fa fa-trash"></i> {{ _('Delete') }}
-          </button>
+          </button> -->
         </div>
         <!-- Status Indicator Section -->
         <style>

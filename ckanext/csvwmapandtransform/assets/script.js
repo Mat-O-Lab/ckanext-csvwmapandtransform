@@ -15,11 +15,16 @@ ckan.module('csvwmapandtransform', function (jQuery) {
         var p;
         p = this.options.parameters.html;
         console.log("Initialized csvwmapandtransform for element: ", this.el);
+        const apiUrl = this.el.get(0).getAttribute("data-api-url"); // Fetch the API URL from the parent element
+        if (!apiUrl) {
+          console.error("No API URL specified for counter:", this.el);
+          return;
+        }
         var log_length;
         log_length = 0;
         var update = function () { // define the update function
           jQuery.ajax({
-            url: "/status",
+            url: apiUrl,
             type: 'GET',
             contentType: p.contentType,
             dataType: p.dataType,

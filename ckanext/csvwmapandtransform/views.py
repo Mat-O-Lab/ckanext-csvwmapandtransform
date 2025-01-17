@@ -7,6 +7,7 @@ import os
 import requests
 import json
 from distutils.util import strtobool
+from .helpers import csvwmapandtransform_service_available
 
 CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 MAPTOMETHOD_URL = os.environ.get("CKAN_MAPTOMETHOD_URL")
@@ -52,6 +53,13 @@ class TransformView(MethodView):
                 "pkg_dict": pkg_dict,
                 "resource": resource,
                 "status": status,
+                "status_url": toolkit.url_for(
+                    "csvwmapandtransform.status",
+                    id=id,
+                    resource_id=resource_id,
+                    qualified=True,
+                ),
+                "service_status": csvwmapandtransform_service_available(),
                 "refresh_rate": 10,
             },
         )
