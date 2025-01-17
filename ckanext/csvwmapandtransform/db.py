@@ -1,9 +1,9 @@
-'''
+"""
 Abstracts a database. Used for storing logging when it csvwmapandtransform a resource into
 DataStore.
 
 Loosely based on ckan-service-provider's db.py
-'''
+"""
 
 import datetime
 import json
@@ -106,8 +106,10 @@ def get_job(job_id):
     if job_id:
         job_id = six.text_type(job_id)
 
-    result = ENGINE.execute(
-        JOBS_TABLE.select().where(JOBS_TABLE.c.job_id == job_id)).first()
+    with ENGINE.connect() as conn:
+        result = conn.execute(
+            JOBS_TABLE.select().where(JOBS_TABLE.c.job_id == job_id)
+        ).first()
 
     if not result:
         return None
@@ -118,15 +120,15 @@ def get_job(job_id):
         value = getattr(result, field)
         if value is None:
             result_dict[field] = value
-        elif field in ('sent_data', 'data', 'error'):
+        elif field in ("sent_data", "data", "error"):
             result_dict[field] = json.loads(value)
         elif isinstance(value, datetime.datetime):
             result_dict[field] = value.isoformat()
         else:
             result_dict[field] = six.text_type(value)
 
-    result_dict['metadata'] = _get_metadata(job_id)
-    result_dict['logs'] = _get_logs(job_id)
+    result_dict["metadata"] = _get_metadata(job_id)
+    result_dict["logs"] = _get_logs(job_id)
 
     return result_dict
 
@@ -179,45 +181,43 @@ def add_pending_job(job_id, job_type, data=None, metadata=None, result_url=None)
     if not metadata:
         metadata = {}
 
-    conn = ENGINE.connect()
-    trans = conn.begin()
-    try:
-        conn.execute(JOBS_TABLE.insert().values(
-            job_id=job_id,
-            job_type=job_type,
-            status='pending',
-            requested_timestamp=datetime.datetime.utcnow(),
-            sent_data=data,
-            result_url=result_url))
-
-        # Insert any (key, value) metadata pairs that the job has into the
-        # metadata table.
-        inserts = []
-        for key, value in list(metadata.items()):
-            type_ = 'string'
-            if not isinstance(value, six.string_types):
-                value = json.dumps(value)
-                type_ = 'json'
-
-            # Turn strings into unicode to stop SQLAlchemy
-            # "Unicode type received non-unicode bind param value" warnings.
-            key = six.text_type(key)
-            value = six.text_type(value)
-
-            inserts.append(
-                {"job_id": job_id,
-                 "key": key,
-                 "value": value,
-                 "type": type_}
+    with ENGINE.connect() as conn:
+        trans = conn.begin()
+        try:
+            conn.execute(
+                JOBS_TABLE.insert().values(
+                    job_id=job_id,
+                    job_type=job_type,
+                    status="pending",
+                    requested_timestamp=datetime.datetime.utcnow(),
+                    sent_data=data,
+                    result_url=result_url,
+                )
             )
-        if inserts:
-            conn.execute(METADATA_TABLE.insert(), inserts)
-        trans.commit()
-    except Exception:
-        trans.rollback()
-        raise
-    finally:
-        conn.close()
+
+            # Insert any (key, value) metadata pairs that the job has into the
+            # metadata table.
+            inserts = []
+            for key, value in list(metadata.items()):
+                type_ = "string"
+                if not isinstance(value, six.string_types):
+                    value = json.dumps(value)
+                    type_ = "json"
+
+                # Turn strings into unicode to stop SQLAlchemy
+                # "Unicode type received non-unicode bind param value" warnings.
+                key = six.text_type(key)
+                value = six.text_type(value)
+
+                inserts.append(
+                    {"job_id": job_id, "key": key, "value": value, "type": type_}
+                )
+            if inserts:
+                conn.execute(METADATA_TABLE.insert(), inserts)
+            trans.commit()
+        except Exception:
+            trans.rollback()
+            raise
 
 
 class InvalidErrorObjectError(Exception):
@@ -257,11 +257,11 @@ def _validate_error(error):
             if isinstance(message, six.string_types):
                 return error
             else:
-                raise InvalidErrorObjectError(
-                    "error['message'] must be a string")
+                raise InvalidErrorObjectError("error['message'] must be a string")
         except (TypeError, KeyError):
             raise InvalidErrorObjectError(
-                "error must be either a string or a dict with a message key")
+                "error must be either a string or a dict with a message key"
+            )
 
 
 def _update_job(job_id, job_dict):
@@ -293,10 +293,10 @@ def _update_job(job_id, job_dict):
     if "data" in job_dict:
         job_dict["data"] = six.text_type(job_dict["data"])
 
-    ENGINE.execute(
-        JOBS_TABLE.update()
-        .where(JOBS_TABLE.c.job_id == job_id)
-        .values(**job_dict))
+    with ENGINE.connect() as conn:
+        conn.execute(
+            JOBS_TABLE.update().where(JOBS_TABLE.c.job_id == job_id).values(**job_dict)
+        )
 
 
 def mark_job_as_completed(job_id, data=None):
@@ -364,25 +364,26 @@ def mark_job_as_failed_to_post_result(job_id):
 
     """
     update_dict = {
-        "error":
-            "Process completed but unable to post to result_url",
+        "error": "Process completed but unable to post to result_url",
     }
     _update_job(job_id, update_dict)
+
 
 def _init_jobs_table():
     """Initialise the "jobs" table in the db."""
     _jobs_table = sqlalchemy.Table(
-        'jobs', _METADATA,
-        sqlalchemy.Column('job_id', sqlalchemy.UnicodeText, primary_key=True),
-        sqlalchemy.Column('job_type', sqlalchemy.UnicodeText),
-        sqlalchemy.Column('status', sqlalchemy.UnicodeText, index=True),
-        sqlalchemy.Column('data', sqlalchemy.UnicodeText),
-        sqlalchemy.Column('error', sqlalchemy.UnicodeText),
-        sqlalchemy.Column('requested_timestamp', sqlalchemy.DateTime),
-        sqlalchemy.Column('finished_timestamp', sqlalchemy.DateTime),
-        sqlalchemy.Column('sent_data', sqlalchemy.UnicodeText),
+        "jobs",
+        _METADATA,
+        sqlalchemy.Column("job_id", sqlalchemy.UnicodeText, primary_key=True),
+        sqlalchemy.Column("job_type", sqlalchemy.UnicodeText),
+        sqlalchemy.Column("status", sqlalchemy.UnicodeText, index=True),
+        sqlalchemy.Column("data", sqlalchemy.UnicodeText),
+        sqlalchemy.Column("error", sqlalchemy.UnicodeText),
+        sqlalchemy.Column("requested_timestamp", sqlalchemy.DateTime),
+        sqlalchemy.Column("finished_timestamp", sqlalchemy.DateTime),
+        sqlalchemy.Column("sent_data", sqlalchemy.UnicodeText),
         # Callback URL:
-        sqlalchemy.Column('result_url', sqlalchemy.UnicodeText),
+        sqlalchemy.Column("result_url", sqlalchemy.UnicodeText),
     )
     return _jobs_table
 
@@ -390,13 +391,17 @@ def _init_jobs_table():
 def _init_metadata_table():
     """Initialise the "metadata" table in the db."""
     _metadata_table = sqlalchemy.Table(
-        'metadata', _METADATA,
+        "metadata",
+        _METADATA,
         sqlalchemy.Column(
-            'job_id', sqlalchemy.ForeignKey("jobs.job_id", ondelete="CASCADE"),
-            nullable=False, primary_key=True),
-        sqlalchemy.Column('key', sqlalchemy.UnicodeText, primary_key=True),
-        sqlalchemy.Column('value', sqlalchemy.UnicodeText, index=True),
-        sqlalchemy.Column('type', sqlalchemy.UnicodeText),
+            "job_id",
+            sqlalchemy.ForeignKey("jobs.job_id", ondelete="CASCADE"),
+            nullable=False,
+            primary_key=True,
+        ),
+        sqlalchemy.Column("key", sqlalchemy.UnicodeText, primary_key=True),
+        sqlalchemy.Column("value", sqlalchemy.UnicodeText, index=True),
+        sqlalchemy.Column("type", sqlalchemy.UnicodeText),
     )
     return _metadata_table
 
@@ -404,16 +409,19 @@ def _init_metadata_table():
 def _init_logs_table():
     """Initialise the "logs" table in the db."""
     _logs_table = sqlalchemy.Table(
-        'logs', _METADATA,
+        "logs",
+        _METADATA,
         sqlalchemy.Column(
-            'job_id', sqlalchemy.ForeignKey("jobs.job_id", ondelete="CASCADE"),
-            nullable=False),
-        sqlalchemy.Column('timestamp', sqlalchemy.DateTime),
-        sqlalchemy.Column('message', sqlalchemy.UnicodeText),
-        sqlalchemy.Column('level', sqlalchemy.UnicodeText),
-        sqlalchemy.Column('module', sqlalchemy.UnicodeText),
-        sqlalchemy.Column('funcName', sqlalchemy.UnicodeText),
-        sqlalchemy.Column('lineno', sqlalchemy.Integer)
+            "job_id",
+            sqlalchemy.ForeignKey("jobs.job_id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sqlalchemy.Column("timestamp", sqlalchemy.DateTime),
+        sqlalchemy.Column("message", sqlalchemy.UnicodeText),
+        sqlalchemy.Column("level", sqlalchemy.UnicodeText),
+        sqlalchemy.Column("module", sqlalchemy.UnicodeText),
+        sqlalchemy.Column("funcName", sqlalchemy.UnicodeText),
+        sqlalchemy.Column("lineno", sqlalchemy.Integer),
     )
     return _logs_table
 
@@ -423,16 +431,17 @@ def _get_metadata(job_id):
     # Avoid SQLAlchemy "Unicode type received non-unicode bind param value"
     # warnings.
     job_id = six.text_type(job_id)
+    with ENGINE.connect() as conn:
+        results = conn.execute(
+            METADATA_TABLE.select().where(METADATA_TABLE.c.job_id == job_id)
+        ).fetchall()
 
-    results = ENGINE.execute(
-        METADATA_TABLE.select().where(
-            METADATA_TABLE.c.job_id == job_id)).fetchall()
     metadata = {}
     for row in results:
-        value = row['value']
-        if row['type'] == 'json':
+        value = row["value"]
+        if row["type"] == "json":
             value = json.loads(value)
-        metadata[row['key']] = value
+        metadata[row["key"]] = value
     return metadata
 
 
@@ -441,9 +450,10 @@ def _get_logs(job_id):
     # Avoid SQLAlchemy "Unicode type received non-unicode bind param value"
     # warnings.
     job_id = six.text_type(job_id)
-
-    results = ENGINE.execute(
-        LOGS_TABLE.select().where(LOGS_TABLE.c.job_id == job_id)).fetchall()
+    with ENGINE.connect() as conn:
+        results = conn.execute(
+            LOGS_TABLE.select().where(LOGS_TABLE.c.job_id == job_id)
+        ).fetchall()
 
     results = [dict(result) for result in results]
 

@@ -1,0 +1,13 @@
+js:
+  filters: rjsmin
+  output: csvwmapandtransform/csvwmapandtransform.js
+  contents:
+    - script.js
+  extra:
+    preload:
+      - base/main
+
+style:
+  contents:
+    - style.css
+  output: csvwmapandtransform/csvwmapandtransform.css

@@ -45,15 +45,6 @@ class TransformView(MethodView):
         status = toolkit.get_action("csvwmapandtransform_transform_status")(
             {}, {"resource_id": resource_id}
         )
-        # status=None
-        # try:
-        #     transform_status=toolkit.get_action('csvwmapandtransform_transform_status')(
-        #             {}, {
-        #                 'resource_id': resource_id
-        #             }
-        #     )
-        # except:
-        #     transform_status=None
 
         return base.render(
             "csvwmapandtransform/transform.html",
@@ -61,6 +52,7 @@ class TransformView(MethodView):
                 "pkg_dict": pkg_dict,
                 "resource": resource,
                 "status": status,
+                "refresh_rate": 10,
             },
         )
 
@@ -139,6 +131,42 @@ def iframe_maptomethod(id, resource_id):
     # log.debug("Response from MapToMethod: {}".format(result))
     return result
 
+
+class StatusView(MethodView):
+
+    def get(self, id: str, resource_id: str):
+        pkg_dict = {}
+        try:
+            pkg_dict = toolkit.get_action("package_show")({}, {"id": id})
+        except (toolkit.ObjectNotFound, toolkit.NotAuthorized):
+            base.abort(404, "Resource not found")
+        status = toolkit.get_action("csvwmapandtransform_transform_status")(
+            {}, {"resource_id": resource_id}
+        )
+        if "logs" in status.keys():
+            for index, item in enumerate(status["logs"]):
+                status["logs"][index]["timestamp"] = (
+                    core_helpers.time_ago_from_timestamp(item["timestamp"])
+                )
+                if item["level"] == "DEBUG":
+                    status["logs"][index]["alertlevel"] = "info"
+                    status["logs"][index]["icon"] = "bug-slash"
+                    status["logs"][index]["class"] = "success"
+                elif item["level"] == "INFO":
+                    status["logs"][index]["alertlevel"] = "info"
+                    status["logs"][index]["icon"] = "check"
+                    status["logs"][index]["class"] = "success"
+                else:
+                    status["logs"][index]["alertlevel"] = "error"
+                    status["logs"][index]["icon"] = "exclamation"
+                    status["logs"][index]["class"] = "failure"
+        return {"pkg_dict": pkg_dict, "status": status}
+
+
+blueprint.add_url_rule(
+    "/dataset/<id>/resource/<resource_id>/transform/status",
+    view_func=StatusView.as_view(str("status")),
+)
 
 blueprint.add_url_rule(
     "/dataset/<id>/resource/<resource_id>/transform",

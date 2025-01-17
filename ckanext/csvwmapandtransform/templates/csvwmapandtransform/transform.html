@@ -3,6 +3,11 @@
 {% set logged_in = true if c.userobj else false %}
 {% set res = resource %}
 
+{%- block styles %}
+{{ super() }}
+{% asset 'csvwmapandtransform/style' %}
+{% endblock %}
+
 {% block breadcrumb_content_selected %}{% endblock %}
 
 {% block breadcrumb_content %}
@@ -29,83 +34,67 @@
 
   {% block primary_content_inner %}
   <h1>{% block form_title %}{{ _('Transform Status') }}{% endblock %}</h1>
-  {% block form %}
-  <form method="post" action="{{ action }}" class="csvwmapandtransform-form">
-    {{ h.csrf_input() }}
-    <button class="btn btn-primary" name="save" type="submit">
-      <i class="fa fa-play"></i> {{ _('Run Transformation') }}
-    </button>
-  </form>
-  {% endblock %}
   {% if status %}
-  {% if status.error and status.error.message %}
-  {% set show_table = false %}
-  <div class="alert alert-error">
-    <strong>{{ _('Upload error:') }}</strong> {{ status.error.message }}
-  </div>
-  {% elif status.task_info and status.task_info.error %}
-  <div class="alert alert-error">
-    {% if status.task_info.error is string %}
-    {# DataPusher < 0.0.3 #} <strong>{{ _('Error:') }}</strong> {{ status.task_info.error }}
-      {% elif status.task_info.error is mapping %}
-      <strong>{{ _('Error:') }}</strong> {{ status.task_info.error.message }}
-      {% for error_key, error_value in status.task_info.error.items() %}
-      {% if error_key != "message" and error_value %}
-      <br>
-      <strong>{{ error_key }}</strong>:
-      {{ error_value }}
-      {% endif %}
-      {% endfor %}
-      {% elif status.task_info.error is iterable %}
-      <strong>{{ _('Error traceback:') }}</strong>
-      <pre>{{ ''.join(status.task_info.error) }}</pre>
-      {% endif %}
-  </div>
-  {% endif %}
-
-
-  <table class="table table-bordered">
-    <colgroup>
-      <col width="150">
-      <col>
-    </colgroup>
-    <tr>
-      <th>{{ _('Status') }}</th>
-      <td>{{ h.csvwmapandtransform__status_description(status) }}</td>
-    </tr>
-    <tr>
-      <th>{{ _('Last updated') }}</th>
-      {% if status.status %}
-      <td><span class="date" title="{{ h.render_datetime(status.last_updated, with_hours=True) }}">{{
-          h.time_ago_from_timestamp(status.last_updated) }}</span></td>
-      {% else %}
-      <td>{{ _('Never') }}</td>
-      {% endif %}
-    </tr>
-  </table>
-
-  {% if status and status.logs %}
-  <h3>{{ _('Transformation Log') }}</h3>
-  <ul class="activity">
-    {% for item in status.logs|sort(attribute='timestamp') %}
-    {% set level = 'info' if item.level == 'DEBUG' else item.level %}
-    {% set icon = 'check' if item.level == 'INFO' else 'exclamation' %}
-    {% set class = ' failure' if icon == 'exclamation' else ' success' %}
-    {% set popover_content = 'test' %}
-    <li class="item {{ class }}">
-      <i class="fa icon fa-{{icon}}"></i>
-      <div class="alert alert-{{level |lower }} mb-0 mt-3" role="alert">
-        {% for line in item.message.strip().split('\n') %}
-        {{ line | urlize }}<br />
-        {% endfor %}
+  <div id="ajax-status" data-module="aiextract">
+    {% block form %}
+    <form class="add-to-group" method="post">
+      {{ h.csrf_input() }}
+      <div class="col-12 d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+          <button class="btn btn-secondary me-2 {% if not
+                      service_status %}disabled{% endif %}" name="extract/update" type="submit">
+            <i class="fa fa-refresh"></i> {{ _('Run Transformation') }}
+          </button>
+          <button class="btn btn-danger invisible" name="delete" type="submit">
+            <i class="fa fa-trash"></i> {{ _('Delete') }}
+          </button>
+        </div>
+        <!-- Status Indicator Section -->
+        <style>
+          .indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: red;
+            /* Default: Service unavailable */
+          }
+        </style>
+        <div class="d-flex align-items-center">
+          <div id="service-indicator" class="indicator" data-bs-toggle="tooltip"
+            title="{{ _('The status of the service (Green means available, Red means unavailable)') }}" {% if
+            service_status %} style="background-color: green;" {% endif %}>
+          </div>
+        </div>
       </div>
-      <span class="date" title="{{ h.render_datetime(item.timestamp, with_hours=True) }}">
-        {{ h.time_ago_from_timestamp(item.timestamp) }}
-      </span>
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
+    </form>
+    {% endblock %}
+    <hr class="mt-0">
+    <div class="invisible" name=status>
+      <table class="table table-bordered">
+        <colgroup>
+          <col width="150">
+          <col>
+        </colgroup>
+        <tr>
+          <th>{{ _('Status') }}</th>
+          <td>{{status.status}}</td>
+        </tr>
+        <tr>
+          <th>{{ _('Last updated') }}</th>
+          {% if status.status %}
+          <td><span class="date" title="{{ h.render_datetime(status.last_updated, with_hours=True) }}">{{
+              h.time_ago_from_timestamp(status.last_updated) }}</span></td>
+          {% else %}
+          <td>{{ _('Never') }}</td>
+          {% endif %}
+        </tr>
+      </table>
+  
+      <h3>{{ _('Graph Update Log') }}</h3>
+      <ul class="activity" name="log">
+      </ul>
+    </div>
+  </div>  
   {% endif %}
   {% endblock %}
 
@@ -114,7 +103,8 @@
   {% snippet 'package/snippets/resources.html', pkg=pkg, active=res.id %}
   {% endblock %}
 
-  {% block scripts %}
+  csvwmapandtransform 
+  {%- block scripts %}
   {{ super() }}
-  {% asset 'vendor/fileupload' %}
+  {% asset 'csvwmapandtransform/js' %}
   {% endblock %}
