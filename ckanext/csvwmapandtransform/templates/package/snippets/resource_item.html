@@ -10,12 +10,14 @@
     {{ _('Create Mapping') }}
   </a>
 </li>
+{% if h.check_access('csvwmapandtransform_transform',res) %}
 <li>
   <a href="{{ url }}/transform" class="dropdown-item  resource-url-maptransform-run" target="_blank" rel="noreferrer">
     <i class="fa fa-external-link"></i>
     {{ _('Transform') }}
   </a>
 </li>
+{% endif %}
 {% endif %}
 {% endif %}
 {% endblock %}
