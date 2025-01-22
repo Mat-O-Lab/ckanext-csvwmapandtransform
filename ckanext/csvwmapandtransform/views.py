@@ -8,6 +8,7 @@ import requests
 import json
 from distutils.util import strtobool
 from .helpers import csvwmapandtransform_service_available
+from ckan.common import _
 
 CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 MAPTOMETHOD_URL = os.environ.get("CKAN_MAPTOMETHOD_URL")
@@ -25,6 +26,10 @@ class TransformView(MethodView):
             toolkit.get_action("csvwmapandtransform_transform")(
                 {}, {"resource_id": resource_id}
             )
+        except toolkit.ObjectNotFound:
+            base.abort(404, "Dataset not found")
+        except toolkit.NotAuthorized:
+            base.abort(403, _("Not authorized to see this page"))
         except toolkit.ValidationError:
             log.debug(toolkit.ValidationError)
 
@@ -41,11 +46,13 @@ class TransformView(MethodView):
             toolkit.g.pkg_dict = pkg_dict
             toolkit.g.resource = resource
 
-        except (toolkit.ObjectNotFound, toolkit.NotAuthorized):
+            status = toolkit.get_action("csvwmapandtransform_transform_status")(
+                {}, {"resource_id": resource_id}
+            )
+        except toolkit.ObjectNotFound:
             base.abort(404, "Resource not found")
-        status = toolkit.get_action("csvwmapandtransform_transform_status")(
-            {}, {"resource_id": resource_id}
-        )
+        except toolkit.NotAuthorized:
+            base.abort(403, _("Not authorized to see this page"))
 
         return base.render(
             "csvwmapandtransform/transform.html",
@@ -79,9 +86,10 @@ class CreateMapView(MethodView):
             # backward compatibility with old templates
             toolkit.g.pkg_dict = pkg_dict
             toolkit.g.resource = resource
-
-        except (toolkit.ObjectNotFound, toolkit.NotAuthorized):
-            base.abort(404, "Resource not found")
+        except toolkit.ObjectNotFound:
+            base.abort(404, "Dataset not found")
+        except toolkit.NotAuthorized:
+            base.abort(403, _("Not authorized to see this page"))
         # iframe_url = toolkit.url_for(
         #     "api.action",
         #     ver=3,
@@ -146,11 +154,14 @@ class StatusView(MethodView):
         pkg_dict = {}
         try:
             pkg_dict = toolkit.get_action("package_show")({}, {"id": id})
-        except (toolkit.ObjectNotFound, toolkit.NotAuthorized):
+            status = toolkit.get_action("csvwmapandtransform_transform_status")(
+                {}, {"resource_id": resource_id}
+            )
+        except toolkit.ObjectNotFound:
             base.abort(404, "Resource not found")
-        status = toolkit.get_action("csvwmapandtransform_transform_status")(
-            {}, {"resource_id": resource_id}
-        )
+        except toolkit.NotAuthorized:
+            base.abort(403, _("Not authorized to see this page"))
+            
         if "logs" in status.keys():
             for index, item in enumerate(status["logs"]):
                 status["logs"][index]["timestamp"] = (
