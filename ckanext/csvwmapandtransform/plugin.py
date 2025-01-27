@@ -1,8 +1,10 @@
-import re, os
+import os
+import re
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 from ckan import model
+from ckan.config.declaration import Declaration, Key
 from ckan.lib.plugins import DefaultTranslation
 
 if toolkit.check_ckan_version("2.10"):
@@ -16,29 +18,15 @@ else:
 
 from typing import Any
 
-from ckanext.csvwmapandtransform import action, helpers, auth, views
+from ckanext.csvwmapandtransform import action, auth, helpers, views
 
 log = __import__("logging").getLogger(__name__)
-
-DEFAULT_FORMATS = os.environ.get("CSVWMAPANDTRANSFORM_FORMATS", "").lower().split()
-if not DEFAULT_FORMATS:
-    DEFAULT_FORMATS = [
-        "json",
-        "turtle",
-        "text/turtle" "n3",
-        "nt",
-        "hext",
-        "trig",
-        "longturtle",
-        "xml",
-        "json-ld",
-        "ld+json",
-    ]
 
 
 class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
     plugins.implements(plugins.ITranslation)
     plugins.implements(plugins.IConfigurer)
+    plugins.implements(plugins.IConfigDeclaration)
     plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IResourceUrlChange)
     plugins.implements(plugins.IResourceController, inherit=True)
@@ -52,6 +40,21 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
         toolkit.add_template_directory(config_, "templates")
         toolkit.add_public_directory(config_, "public")
         toolkit.add_resource("assets", "csvwmapandtransform")
+
+    # IConfigDeclaration
+
+    def declare_config_options(self, declaration: Declaration, key: Key):
+
+        declaration.annotate("csvwmapandtransform")
+        group = key.ckanext.csvwmapandtransform
+        declaration.declare_bool(group.ssl_verify, True)
+        declaration.declare(group.db_url, plugins.toolkit.config.get("sqlalchemy.url"))
+        declaration.declare(group.maptomethod_url, "https://maptomethod.matolab.org")
+        declaration.declare(group.rdfconverter_url, "https://rdfconverter.matolab.org")
+        declaration.declare(group.ckan_token, "")
+        declaration.declare(
+            group.formats, "json json-ld turtle n3 nt hext trig longturtle xml ld+json"
+        )
 
     # IResourceUrlChange
 
@@ -83,10 +86,11 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
 
     def _sumbit_transform(self, resource_dict: dict[str, Any]):
         context = {"model": model, "ignore_auth": True, "defer_commit": True}
+        formats = toolkit.config.get("ckanext.csvwmapandtransform.formats")
         format = resource_dict.get("format", None)
         submit = (
             format
-            and format.lower() in DEFAULT_FORMATS
+            and format.lower() in formats
             and "-joined" not in resource_dict["url"]
         )
         log.debug(

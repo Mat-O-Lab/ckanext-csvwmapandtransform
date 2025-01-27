@@ -1,0 +1,9 @@
+{% ckan_extends %}
+
+{% block content_primary_nav %}
+{{ super() }}
+tetest
+{% if h.check_access('package_update', {'id':pkg.id }) %}
+{{ h.build_nav_icon('csvwmapandtransform.transform', _('Transform'), id=pkg.name, icon='file-export') }}
+{% endif %}
+{% endblock %}

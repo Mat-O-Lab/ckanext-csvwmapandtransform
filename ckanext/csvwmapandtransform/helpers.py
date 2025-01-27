@@ -1,9 +1,12 @@
 # encoding: utf-8
 
+import re
 from typing import Any
+
 import ckan.plugins.toolkit as toolkit
 import requests
-import re, os
+
+log = __import__("logging").getLogger(__name__)
 
 
 def csvwmapandtransform__status_description(status: dict[str, Any]):
@@ -27,28 +30,32 @@ def common_member(a, b):
 
 
 def csvwmapandtransform_show_tools(resource):
-    from ckanext.csvwmapandtransform.plugin import DEFAULT_FORMATS
+    formats = toolkit.config.get("ckanext.csvwmapandtransform.formats")
 
     format_parts = re.split("/|;", resource["format"].lower().replace(" ", ""))
-    if common_member(format_parts, DEFAULT_FORMATS):
+    if common_member(format_parts, formats):
         return True
     else:
         False
 
 
 def csvwmapandtransform_service_available():
-    extract_url = os.environ.get("CKAN_RDFCONVERTER_URL", "")
-    if not extract_url:
+    url = toolkit.config.get("ckanext.csvwmapandtransform.maptomethod_url")
+    ssl_verify = toolkit.config.get("ckanext.csvwmapandtransform.ssl_verify")
+    # log.debug(f"mapomethodurl: {url} {bool(url)}")
+    if not url:
         return False  # If EXTRACT_URL is not set, return False
     try:
         # Perform a HEAD request (lightweight check) to see if the service responds
-        response = requests.head(extract_url, timeout=5)
+        response = requests.head(url, timeout=5, verify=ssl_verify)
+        # log.debug(f"reponse: {response}")
         if (200 <= response.status_code < 400) or response.status_code == 405:
             return True  # URL is reachable and returns a valid status code
         else:
             return False  # URL is reachable but response status is not valid
     except requests.RequestException as e:
         # If there's any issue (timeout, connection error, etc.)
+        # log.debug(e)
         return False
 
 

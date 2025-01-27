@@ -1,18 +1,15 @@
-from flask import Blueprint, request, Request
-from flask.views import MethodView
-import ckan.plugins.toolkit as toolkit
-import ckan.lib.helpers as core_helpers
-import ckan.lib.base as base
-import os
-import requests
 import json
-from distutils.util import strtobool
-from .helpers import csvwmapandtransform_service_available
-from ckan.common import _
+import os
 
-CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
-MAPTOMETHOD_URL = os.environ.get("CKAN_MAPTOMETHOD_URL")
-SSL_VERIFY = bool(strtobool(os.environ.get("CSVWMAPANDTRANSFORM_SSL_VERIFY", True)))
+import ckan.lib.base as base
+import ckan.lib.helpers as core_helpers
+import ckan.plugins.toolkit as toolkit
+import requests
+from ckan.common import _
+from flask import Blueprint, Request, request
+from flask.views import MethodView
+
+from ckanext.csvwmapandtransform.helpers import csvwmapandtransform_service_available
 
 log = __import__("logging").getLogger(__name__)
 
@@ -119,7 +116,7 @@ def iframe_maptomethod(id, resource_id):
     #     url = data_dict['data_url']
     headers = {
         "Content-Type": "application/json",
-        "Authorization": CSVWMAPANDTRANSFORM_TOKEN,
+        "Authorization": toolkit.config.get("ckanext.csvwmapandtransform.ckan_token"),
         "Accept": "text/html",
     }
     resource_dict = toolkit.get_action("resource_show")({}, {"id": resource_id})
@@ -134,12 +131,15 @@ def iframe_maptomethod(id, resource_id):
         "advanced-method_object_super_class_uris-0": "https://spec.industrialontologies.org/ontology/core/Core/InformationContentEntity",
         "advanced-method_object_super_class_uris-1": "http://purl.obolibrary.org/obo/BFO_0000008",
     }
-    log.debug(SSL_VERIFY)
+    ssl_verify = toolkit.config.get("ckanext.csvwmapandtransform.ssl_verify")
+    if not ssl_verify:
+        requests.packages.urllib3.disable_warnings()
+    maptomethod_url = toolkit.config.get("ckanext.csvwmapandtransform.maptomethod_url")
     html = requests.post(
-        url=MAPTOMETHOD_URL + "/create_mapper",
+        url=maptomethod_url + "/create_mapper",
         headers=headers,
         data=json.dumps(data),
-        verify=SSL_VERIFY,
+        verify=ssl_verify,
     )
     # html=requests.post(url="http://docker-dev.iwm.fraunhofer.de:6002"+"/create_mapper", headers=headers, data=json.dumps(data))
     html.raise_for_status()
@@ -161,8 +161,8 @@ class StatusView(MethodView):
             base.abort(404, "Resource not found")
         except toolkit.NotAuthorized:
             base.abort(403, _("Not authorized to see this page"))
-            
-        if "logs" in status.keys():
+
+        if status and "logs" in status.keys():
             for index, item in enumerate(status["logs"]):
                 status["logs"][index]["timestamp"] = (
                     core_helpers.time_ago_from_timestamp(item["timestamp"])

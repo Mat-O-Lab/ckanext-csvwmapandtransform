@@ -9,21 +9,21 @@ else:
             super().__init__(**kwargs)
 
 
-from ckan.lib.jobs import DEFAULT_QUEUE_NAME
-from ckan import model
-from typing import Any
+import datetime
+import itertools
 import json
-
-from ckanext.csvwmapandtransform import mapper, db
-from ckanext.csvwmapandtransform.tasks import transform
+import os
+from typing import Any
 
 import ckanapi
-import itertools
-import datetime
-from dateutil.parser import parse as parse_date
-from dateutil.parser import isoparse as parse_iso_date
 import sqlalchemy as sa
-import os
+from ckan import model
+from ckan.lib.jobs import DEFAULT_QUEUE_NAME
+from dateutil.parser import isoparse as parse_iso_date
+from dateutil.parser import parse as parse_date
+
+from ckanext.csvwmapandtransform import db, mapper
+from ckanext.csvwmapandtransform.tasks import transform
 
 log = __import__("logging").getLogger(__name__)
 # must be lower case alphanumeric and these symbols: -_
@@ -31,17 +31,17 @@ MAPPING_GROUP = "mappings"
 METHOD_GROUP = "methods"
 JOB_TIMEOUT = 180
 
-CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 
 def find_first_matching_id(dicts: list, key: str, value: str):
     return next((d["id"] for d in dicts if d.get(key) == value), None)
 
+
 def csvwmapandtransform_find_mappings(context: Context, data_dict):
     mapping_group_id = find_first_matching_id(
-            toolkit.get_action("group_list")({}, {"all_fields": True}),
-            key="name",
-            value=MAPPING_GROUP,
-        )
+        toolkit.get_action("group_list")({}, {"all_fields": True}),
+        key="name",
+        value=MAPPING_GROUP,
+    )
     if mapping_group_id:
         mapping_group = toolkit.get_action("group_show")(
             {"ignore_auth": True}, {"id": mapping_group_id, "include_datasets": True}

@@ -1,16 +1,15 @@
+import datetime
 import json
-import os
 import tempfile
 
 import ckanapi
 import ckanapi.datapackage
 import requests
-from ckan.plugins.toolkit import get_action, asbool
 from ckan import model
-import datetime
+from ckan.plugins.toolkit import asbool, config, get_action
 
 # from ckanext.csvtocsvw.annotate import annotate_csv_upload
-from ckanext.csvwmapandtransform import mapper, db
+from ckanext.csvwmapandtransform import db, mapper
 
 try:
     from urllib.parse import urlsplit
@@ -19,17 +18,10 @@ except ImportError:
 
 # log = __import__("logging").getLogger(__name__)
 
-CKAN_URL = os.environ.get("CKAN_SITE_URL", "http://localhost:5000")
-CSVWMAPANDTRANSFORM_TOKEN = os.environ.get("CSVWMAPANDTRANSFORM_TOKEN", "")
 CHUNK_INSERT_ROWS = 250
 
-SSL_VERIFY = asbool(os.environ.get("CSVWMAPANDTRANSFORM_SSL_VERIFY", True))
-if not SSL_VERIFY:
-    requests.packages.urllib3.disable_warnings()
-
-
-from werkzeug.datastructures import FileStorage as FlaskFileStorage
 from rq import get_current_job
+from werkzeug.datastructures import FileStorage as FlaskFileStorage
 
 
 def transform(
@@ -40,11 +32,12 @@ def transform(
     tomap_res = get_action("resource_show")({"ignore_auth": True}, {"id": res_id})
     context = {"session": model.meta.create_local_session(), "ignore_auth": True}
     metadata = {
-        "ckan_url": CKAN_URL,
+        "ckan_url": config.get("ckan.site_url"),
         "resource_id": res_id,
         "task_created": last_updated,
         "original_url": res_url,
     }
+    token = config.get("ckanext.csvwmapandtransform.ckan_token")
     job_info = dict()
     job_dict = dict(metadata=metadata, status="running", job_info=job_info)
     job_id = get_current_job().id
@@ -63,9 +56,7 @@ def transform(
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(logging.DEBUG)
 
-    callback_csvwmapandtransform_hook(
-        callback_url, api_key=CSVWMAPANDTRANSFORM_TOKEN, job_dict=job_dict
-    )
+    callback_csvwmapandtransform_hook(callback_url, api_key=token, job_dict=job_dict)
     logger.info("Trying to find fitting mapping for: {}".format(tomap_res["url"]))
     # need to get it as string, casue url annotation doesnt work with private datasets
     # filename,filedata=annotate_csv_uri(csv_res['url'])
@@ -86,7 +77,7 @@ def transform(
             "test": mapper.check_mapping(
                 map_url=map_url,
                 data_url=tomap_res["url"],
-                authorization=CSVWMAPANDTRANSFORM_TOKEN,
+                authorization=token,
             ),
         }
         for map_url in mapping_urls
@@ -102,9 +93,7 @@ def transform(
     # sort by rating
     sorted_list = sorted(valid_items, key=lambda x: x["rating"], reverse=True)
     logger.info("Rated mappings: {}".format(sorted_list))
-    callback_csvwmapandtransform_hook(
-        callback_url, api_key=CSVWMAPANDTRANSFORM_TOKEN, job_dict=job_dict
-    )
+    callback_csvwmapandtransform_hook(callback_url, api_key=token, job_dict=job_dict)
     # best cnadidate is sorted_list[0]
     if sorted_list and sorted_list[0]["rating"] > 0:
         best_condidate = sorted_list[0]["mapping"]
@@ -115,71 +104,65 @@ def transform(
         filename, graph_data, num_applied, num_skipped = mapper.get_joined_rdf(
             map_url=best_condidate,
             data_url=tomap_res["url"],
-            authorization=CSVWMAPANDTRANSFORM_TOKEN,
+            authorization=token,
         )
-        s = requests.Session()
-        s.headers.update({"Authorization": CSVWMAPANDTRANSFORM_TOKEN})
-        prefix, suffix = filename.rsplit(".", 1)
-        if not prefix:
-            prefix = "unnamed"
-        if not suffix:
-            suffix = "ttl"
-        # log.debug(csv_data)
-        # # Upload resource to CKAN as a new/updated resource
-        ressouce_existing = resource_search(dataset_id, filename)
-        with tempfile.NamedTemporaryFile(
-            prefix=prefix, suffix="." + suffix
-        ) as graph_file:
-            graph_file.write(graph_data.encode("utf-8"))
-            graph_file.seek(0)
-            tmp_filename = graph_file.name
-            upload = FlaskFileStorage(open(tmp_filename, "rb"), filename)
-            resource = dict(
-                package_id=dataset_id,
-                # url='dummy-value',
-                upload=upload,
-                name=filename,
-                format="text/turtle; charset=utf-8",
-            )
-            if not ressouce_existing:
-                logger.info(
-                    "Writing new resource {} to dataset {}".format(filename, dataset_id)
+        if not filename:
+            errored = True
+        else:
+            s = requests.Session()
+            s.headers.update({"Authorization": token})
+            prefix, suffix = filename.rsplit(".", 1)
+            if not prefix:
+                prefix = "unnamed"
+            if not suffix:
+                suffix = "ttl"
+            # log.debug(csv_data)
+            # # Upload resource to CKAN as a new/updated resource
+            ressouce_existing = resource_search(dataset_id, filename)
+            with tempfile.NamedTemporaryFile(
+                prefix=prefix, suffix="." + suffix
+            ) as graph_file:
+                graph_file.write(graph_data.encode("utf-8"))
+                graph_file.seek(0)
+                tmp_filename = graph_file.name
+                upload = FlaskFileStorage(open(tmp_filename, "rb"), filename)
+                resource = dict(
+                    package_id=dataset_id,
+                    # url='dummy-value',
+                    upload=upload,
+                    name=filename,
+                    format="text/turtle; charset=utf-8",
                 )
-                # local_ckan.action.resource_create(**resource)
-                metadata_res = get_action("resource_create")(
-                    {"ignore_auth": True}, resource
-                )
-            else:
-                logger.info("Updating resource - {}".format(ressouce_existing["url"]))
-                # local_ckan.action.resource_patch(
-                #     id=res['id'],
-                #     **resource)
-                resource["id"] = ressouce_existing["id"]
-                metadata_res = get_action("resource_update")(
-                    {"ignore_auth": True}, resource
-                )
-        logger.info("job completed results at {}".format(metadata_res["url"]))
-
+                if not ressouce_existing:
+                    logger.info(
+                        "Writing new resource {} to dataset {}".format(
+                            filename, dataset_id
+                        )
+                    )
+                    # local_ckan.action.resource_create(**resource)
+                    metadata_res = get_action("resource_create")(
+                        {"ignore_auth": True}, resource
+                    )
+                else:
+                    logger.info(
+                        "Updating resource - {}".format(ressouce_existing["url"])
+                    )
+                    # local_ckan.action.resource_patch(
+                    #     id=res['id'],
+                    #     **resource)
+                    resource["id"] = ressouce_existing["id"]
+                    metadata_res = get_action("resource_update")(
+                        {"ignore_auth": True}, resource
+                    )
+            logger.info("job completed results at {}".format(metadata_res["url"]))
     else:
         logger.warning(
             "found no mapping candidate for resource {}".format(tomap_res["url"])
         )
     # all is done update job status
     job_dict["status"] = "complete"
-    callback_csvwmapandtransform_hook(
-        callback_url, api_key=CSVWMAPANDTRANSFORM_TOKEN, job_dict=job_dict
-    )
+    callback_csvwmapandtransform_hook(callback_url, api_key=token, job_dict=job_dict)
     return "error" if errored else None
-
-
-def get_url(action):
-    """
-    Get url for ckan action
-    """
-    if not urlsplit(CKAN_URL).scheme:
-        ckan_url = "http://" + CKAN_URL.lstrip("/")
-    ckan_url = CKAN_URL.rstrip("/")
-    return "{ckan_url}/api/3/action/{action}".format(ckan_url=ckan_url, action=action)
 
 
 def get_resource(id):
@@ -212,12 +195,14 @@ def callback_csvwmapandtransform_hook(result_url, api_key, job_dict):
         else:
             header, key = "Authorization", api_key
         headers[header] = key
-
+    ssl_verify = config.get("ckanext.csvwmapandtransform.ssl_verify")
+    if not ssl_verify:
+        requests.packages.urllib3.disable_warnings()
     try:
         result = requests.post(
             result_url,
             data=json.dumps(job_dict, cls=DatetimeJsonEncoder),
-            verify=SSL_VERIFY,
+            verify=ssl_verify,
             headers=headers,
         )
     except requests.ConnectionError:

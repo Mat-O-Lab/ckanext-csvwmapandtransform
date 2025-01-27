@@ -1,5 +1,6 @@
-import ckanext.datastore.logic.auth as auth
 from ckan.logic.auth.get import task_status_show
+
+import ckanext.datastore.logic.auth as auth
 
 
 def csvwmapandtransform_transform(context, data_dict):
