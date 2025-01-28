@@ -1,9 +1,8 @@
 {% ckan_extends %}
 
-{% block content_primary_nav %}
+{% block action_manage %}
 {{ super() }}
-tetest
-{% if h.check_access('package_update', {'id':pkg.id }) %}
-{{ h.build_nav_icon('csvwmapandtransform.transform', _('Transform'), id=pkg.name, icon='file-export') }}
+{% if h.csvwmapandtransform_show_tools(res) %}
+<li>{% link_for _('Transform'), named_route='csvwmapandtransform.transform', id=pkg.name, resource_id=res.id, class_='btn btn-secondary', icon='play' %}</li>
 {% endif %}
-{% endblock %}
+{% endblock action_manage %}
