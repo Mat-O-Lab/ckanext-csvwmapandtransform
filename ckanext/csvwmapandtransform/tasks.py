@@ -101,6 +101,7 @@ def transform(
         best_condidate = None
     # run mapping and join data
     if best_condidate:
+        logger.info(f"Applying best mapping candidate: {best_condidate}")
         filename, graph_data, num_applied, num_skipped = mapper.get_joined_rdf(
             map_url=best_condidate,
             data_url=tomap_res["url"],
@@ -108,6 +109,10 @@ def transform(
         )
         if not filename:
             errored = True
+            logger.error(
+                f"Failed to generate RDF from mapping {best_condidate} for resource {tomap_res['url']}. "
+                "Check previous error messages for details."
+            )
         else:
             s = requests.Session()
             s.headers.update({"Authorization": token})
