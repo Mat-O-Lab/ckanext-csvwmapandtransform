@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ckanext-csvwmapandtransform"
 dynamic = ["version"]
-description = "Extension to automate mapping of csvw meta data documents to knowledge graphs and run automatic pipelines by testing for compatible mapping present in ckan, uses mat-o-lab tools MaptoMethod and RDFConverter."
+description = "CKAN extension facilitating YARRRML mappings in conjunction with RDFConverter to run automatic transforms matching best fitting maps as a background job."
 readme = "README.md"
 authors = [
     {name = "Thomas Hanke", email = "thomas.hanke@iwm.fraunhofer.de"}
