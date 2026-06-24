@@ -148,11 +148,11 @@ def csvwmapandtransform_transform_status(
         db_job = db.get_job(job_id)
 
         if db_job and db_job.get("logs"):
-            for log in db_job["logs"]:
-                if "timestamp" in log and isinstance(
-                    log["timestamp"], datetime.datetime
+            for entry in db_job["logs"]:
+                if "timestamp" in entry and isinstance(
+                    entry["timestamp"], datetime.datetime
                 ):
-                    log["timestamp"] = log["timestamp"].isoformat()
+                    entry["timestamp"] = entry["timestamp"].isoformat()
         status = dict(status, **db_job)
         # status['task_info']=db_job
     return status
