@@ -95,4 +95,4 @@ addopts = "--ckan-ini test.ini"
 # Version is automatically derived from git tags
 # Use tags like 'v1.0.3', 'v1.1.0', etc.
 # Dev versions between tags will be like '1.0.2.post1.dev5+g85e4719'
-fallback_version = "0.0.0.dev0"
+fallback_version = "0.1.0"
