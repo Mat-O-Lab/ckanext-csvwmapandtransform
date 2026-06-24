@@ -1,34 +1,29 @@
 import datetime
 import json
+import logging
+import sys
 import tempfile
+from urllib.parse import urlsplit
 
 import ckanapi
 import ckanapi.datapackage
+import ckanapi.errors
 import requests
 from ckan import model
 from ckan.plugins.toolkit import asbool, config, get_action
-
-# from ckanext.csvtocsvw.annotate import annotate_csv_upload
-from ckanext.csvwmapandtransform import db, mapper
-
-try:
-    from urllib.parse import urlsplit
-except ImportError:
-    from urlparse import urlsplit
-
-# log = __import__("logging").getLogger(__name__)
-
-CHUNK_INSERT_ROWS = 250
-
 from rq import get_current_job
 from werkzeug.datastructures import FileStorage as FlaskFileStorage
+
+from ckanext.csvwmapandtransform import db, mapper
+
+log = logging.getLogger(__name__)
+
+CHUNK_INSERT_ROWS = 250
 
 
 def transform(
     res_url, res_id, dataset_id, callback_url, last_updated, skip_if_no_changes=True
 ):
-    # url = '{ckan}/dataset/{pkg}/resource/{res_id}/download/{filename}'.format(
-    #         ckan=CKAN_URL, pkg=dataset_id, res_id=res_id, filename=res_url)
     tomap_res = get_action("resource_show")({"ignore_auth": True}, {"id": res_id})
     context = {"session": model.meta.create_local_session(), "ignore_auth": True}
     metadata = {
@@ -42,6 +37,7 @@ def transform(
     job_dict = dict(metadata=metadata, status="running", job_info=job_info)
     job_id = get_current_job().id
     errored = False
+    error_message = None
     db.init()
 
     # Set-up logging to the db
@@ -49,59 +45,121 @@ def transform(
     level = logging.DEBUG
     handler.setLevel(level)
     logger = logging.getLogger(job_id)
-    # logger = logging.getLogger()
     handler.setFormatter(logging.Formatter("%(message)s"))
     logger.addHandler(handler)
     # also show logs on stderr
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(logging.DEBUG)
 
+    job_start = datetime.datetime.utcnow()
+
     callback_csvwmapandtransform_hook(callback_url, api_key=token, job_dict=job_dict)
-    logger.info("Trying to find fitting mapping for: {}".format(tomap_res["url"]))
-    # need to get it as string, casue url annotation doesnt work with private datasets
-    # filename,filedata=annotate_csv_uri(csv_res['url'])
+    logger.info("Job started: transform for resource {}".format(res_id))
+    logger.info("Trying to find fitting mapping for: <a href='{url}' target='_blank'>{name}</a>".format(
+        url=tomap_res["url"], name=tomap_res["url"].split("/")[-1]
+    ))
+
     mappings = get_action("csvwmapandtransform_find_mappings")({}, {})
     mapping_urls = [res["url"] for res in mappings]
-    logger.info("Mappings found: {}".format(mapping_urls))
-    # tests=get_action(u'csvwmapandtransform_test_mappings')(
-    #             {}, {
-    #                 u'data_url': resource['url'],
-    #                 u'map_urls': [res['url'] for res in mapping_resources]
-    #             }
-    #         )
-    logger.info("testing mappings with: {}".format(tomap_res["url"]))
-    # tests=get_action(u'csvwmapandtransform_test_map
-    res = [
-        {
-            "mapping": map_url,
-            "test": mapper.check_mapping(
-                map_url=map_url,
-                data_url=tomap_res["url"],
-                authorization=token,
-            ),
-        }
-        for map_url in mapping_urls
-    ]
+    logger.info("Mappings found: {} YAML resources".format(len(mapping_urls)))
+
+    tested_ok = 0
+    tested_failed = 0
+    res = []
+    for map_url in mapping_urls:
+        result = mapper.check_mapping(
+            map_url=map_url,
+            data_url=tomap_res["url"],
+            authorization=token,
+        )
+        if result is None:
+            logger.warning(
+                "check_mapping failed for {} — skipped".format(map_url.split("/")[-1])
+            )
+            tested_failed += 1
+        else:
+            tested_ok += 1
+        res.append({"mapping": map_url, "test": result})
+
+    logger.info(
+        "Tested {}: {} ok, {} failed".format(len(mapping_urls), tested_ok, tested_failed)
+    )
+
     # remove None resulting test Items
     valid_items = [item for item in res if item["test"]]
     for item in valid_items:
-        if item["test"]:
-            # the more rules can be applied and the more are not skipped the better the mapping
-            item["rating"] = (
-                item["test"]["rules_applicable"] - item["test"]["rules_skipped"]
-            )
-    # sort by rating
+        item["rating"] = (
+            item["test"].get("rules_applicable", 0) - item["test"].get("rules_skipped", 0)
+        )
+    # sort by rating descending
     sorted_list = sorted(valid_items, key=lambda x: x["rating"], reverse=True)
-    logger.info("Rated mappings: {}".format(sorted_list))
-    callback_csvwmapandtransform_hook(callback_url, api_key=token, job_dict=job_dict)
-    # best cnadidate is sorted_list[0]
-    if sorted_list and sorted_list[0]["rating"] > 0:
-        best_condidate = sorted_list[0]["mapping"]
+    rated_summary = [
+        {
+            "url": m["mapping"],
+            "name": m["mapping"].split("/")[-1],
+            "rating": m["rating"],
+            "skipped": m["test"].get("rules_skipped", 0),
+        }
+        for m in sorted_list
+    ]
+    if rated_summary:
+        TOP_N = 10
+        shown = rated_summary[:TOP_N]
+        rest = len(rated_summary) - TOP_N
+        rows = "".join(
+            "<tr><td><a href='{}' target='_blank'>{}</a></td><td>{}</td><td>{}</td></tr>".format(
+                m["url"], m["name"], m["rating"], m["skipped"]
+            )
+            for m in shown
+        )
+        if rest > 0:
+            rows += "<tr><td colspan='3'><em>… and {} more</em></td></tr>".format(rest)
+        table = (
+            "<strong>Rated mappings ({}):</strong>"
+            "<div style='overflow-x:auto'>"
+            "<table class='table table-sm table-bordered table-striped'>"
+            "<thead><tr><th>Mapping</th><th>Rating</th><th>Skipped</th></tr></thead>"
+            "<tbody>{}</tbody></table></div>"
+        ).format(len(rated_summary), rows)
+        logger.info(table)
     else:
-        best_condidate = None
-    # run mapping and join data
+        logger.info("Rated mappings: (none)")
+    callback_csvwmapandtransform_hook(callback_url, api_key=token, job_dict=job_dict)
+
+    strategy = config.get("ckanext.csvwmapandtransform.mapping_strategy", "exact")
+    if strategy == "exact":
+        candidates = [
+            item
+            for item in sorted_list
+            if item["test"].get("rules_skipped", 0) == 0
+            and item["test"].get("rules_applicable", 0) > 0
+        ]
+    elif strategy == "best_match":
+        candidates = [item for item in sorted_list if item["rating"] > 0]
+    else:
+        logger.warning(
+            "Unknown mapping_strategy '{}', falling back to 'exact'.".format(strategy)
+        )
+        candidates = [
+            item
+            for item in sorted_list
+            if item["test"].get("rules_skipped", 0) == 0
+            and item["test"].get("rules_applicable", 0) > 0
+        ]
+    logger.info(
+        "Strategy '{}': {} candidate(s) found.".format(strategy, len(candidates))
+    )
+    best_condidate = candidates[0]["mapping"] if candidates else None
     if best_condidate:
-        logger.info(f"Applying best mapping candidate: {best_condidate}")
+        winner_name = best_condidate.split("/")[-1]
+        winner_rating = candidates[0]["rating"]
+        logger.info(
+            "Winner: <a href='{url}' target='_blank'>{name}</a> (rating={rating}, strategy={strategy})".format(
+                url=best_condidate, name=winner_name, rating=winner_rating, strategy=strategy
+            )
+        )
+
+    if best_condidate:
         filename, graph_data, num_applied, num_skipped = mapper.get_joined_rdf(
             map_url=best_condidate,
             data_url=tomap_res["url"],
@@ -109,9 +167,11 @@ def transform(
         )
         if not filename:
             errored = True
+            error_message = "Failed to generate RDF from mapping {} for resource {}".format(
+                best_condidate.split("/")[-1], res_id
+            )
             logger.error(
-                f"Failed to generate RDF from mapping {best_condidate} for resource {tomap_res['url']}. "
-                "Check previous error messages for details."
+                error_message + ". Check previous error messages for details."
             )
         else:
             s = requests.Session()
@@ -121,51 +181,81 @@ def transform(
                 prefix = "unnamed"
             if not suffix:
                 suffix = "ttl"
-            # log.debug(csv_data)
-            # # Upload resource to CKAN as a new/updated resource
-            ressouce_existing = resource_search(dataset_id, filename)
-            with tempfile.NamedTemporaryFile(
-                prefix=prefix, suffix="." + suffix
-            ) as graph_file:
-                graph_file.write(graph_data.encode("utf-8"))
-                graph_file.seek(0)
-                tmp_filename = graph_file.name
-                upload = FlaskFileStorage(open(tmp_filename, "rb"), filename)
-                resource = dict(
-                    package_id=dataset_id,
-                    # url='dummy-value',
-                    upload=upload,
-                    name=filename,
-                    format="text/turtle; charset=utf-8",
+
+            try:
+                resource_existing = resource_search(dataset_id, filename)
+            except ckanapi.errors.NotFound:
+                errored = True
+                error_message = "Dataset {} not found when searching for existing resource".format(
+                    dataset_id
                 )
-                if not ressouce_existing:
-                    logger.info(
-                        "Writing new resource {} to dataset {}".format(
-                            filename, dataset_id
+                logger.error(error_message)
+                resource_existing = None
+
+            if not errored:
+                with tempfile.NamedTemporaryFile(
+                    prefix=prefix, suffix="." + suffix
+                ) as graph_file:
+                    graph_file.write(graph_data.encode("utf-8"))
+                    graph_file.seek(0)
+                    tmp_filename = graph_file.name
+                    upload = FlaskFileStorage(open(tmp_filename, "rb"), filename)
+                    resource = dict(
+                        package_id=dataset_id,
+                        upload=upload,
+                        name=filename,
+                        format="text/turtle; charset=utf-8",
+                    )
+                    try:
+                        if not resource_existing:
+                            logger.info("Writing new resource <strong>{}</strong> to dataset {}".format(
+                                filename, dataset_id
+                            ))
+                            metadata_res = get_action("resource_create")(
+                                {"ignore_auth": True}, resource
+                            )
+                        else:
+                            logger.info(
+                                "Updating resource <a href='{url}' target='_blank'>{name}</a>".format(
+                                    url=resource_existing["url"],
+                                    name=resource_existing["url"].split("/")[-1],
+                                )
+                            )
+                            resource["id"] = resource_existing["id"]
+                            metadata_res = get_action("resource_update")(
+                                {"ignore_auth": True}, resource
+                            )
+                        logger.info(
+                            "Job completed — results at <a href='{url}' target='_blank'>{name}</a>".format(
+                                url=metadata_res["url"],
+                                name=metadata_res["url"].split("/")[-1],
+                            )
                         )
-                    )
-                    # local_ckan.action.resource_create(**resource)
-                    metadata_res = get_action("resource_create")(
-                        {"ignore_auth": True}, resource
-                    )
-                else:
-                    logger.info(
-                        "Updating resource - {}".format(ressouce_existing["url"])
-                    )
-                    # local_ckan.action.resource_patch(
-                    #     id=res['id'],
-                    #     **resource)
-                    resource["id"] = ressouce_existing["id"]
-                    metadata_res = get_action("resource_update")(
-                        {"ignore_auth": True}, resource
-                    )
-            logger.info("job completed results at {}".format(metadata_res["url"]))
+                    except Exception as e:
+                        errored = True
+                        error_message = "Failed to write resource {} to dataset {}: {}".format(
+                            filename, dataset_id, str(e)
+                        )
+                        logger.error(error_message)
     else:
         logger.warning(
-            "found no mapping candidate for resource {}".format(tomap_res["url"])
+            "No mapping candidate found for <a href='{url}' target='_blank'>{name}</a>".format(
+                url=tomap_res["url"], name=tomap_res["url"].split("/")[-1]
+            )
         )
-    # all is done update job status
-    job_dict["status"] = "complete"
+
+    # all is done — update job status
+    duration = (datetime.datetime.utcnow() - job_start).total_seconds()
+    logger.info(
+        "Job finished in {:.1f}s — status: {}".format(
+            duration, "error" if errored else "ok"
+        )
+    )
+    if errored:
+        job_dict["status"] = "error"
+        job_dict["error"] = error_message
+    else:
+        job_dict["status"] = "complete"
     callback_csvwmapandtransform_hook(callback_url, api_key=token, job_dict=job_dict)
     return "error" if errored else None
 
@@ -200,7 +290,7 @@ def callback_csvwmapandtransform_hook(result_url, api_key, job_dict):
         else:
             header, key = "Authorization", api_key
         headers[header] = key
-    ssl_verify = config.get("ckanext.csvwmapandtransform.ssl_verify")
+    ssl_verify = asbool(config.get("ckanext.csvwmapandtransform.ssl_verify", True))
     if not ssl_verify:
         requests.packages.urllib3.disable_warnings()
     try:
@@ -211,12 +301,14 @@ def callback_csvwmapandtransform_hook(result_url, api_key, job_dict):
             headers=headers,
         )
     except requests.ConnectionError:
+        log.warning(
+            "Callback to {} failed — CKAN task_status will not be updated".format(
+                urlsplit(result_url).path
+            )
+        )
         return False
 
     return result.status_code == requests.codes.ok
-
-
-import logging
 
 
 class StoringHandler(logging.Handler):
@@ -248,8 +340,8 @@ class StoringHandler(logging.Handler):
                     lineno=record.lineno,
                 )
             )
-        except:
-            pass
+        except Exception as e:
+            sys.stderr.write("StoringHandler DB write failed: {}\n".format(e))
         finally:
             conn.close()
 

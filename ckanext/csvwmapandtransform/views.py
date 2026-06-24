@@ -167,6 +167,7 @@ class StatusView(MethodView):
                 status["logs"][index]["timestamp"] = (
                     core_helpers.time_ago_from_timestamp(item["timestamp"])
                 )
+                status["logs"][index]["message"] = item["message"]
                 if item["level"] == "DEBUG":
                     status["logs"][index]["alertlevel"] = "info"
                     status["logs"][index]["icon"] = "bug-slash"

@@ -6,21 +6,28 @@ import requests
 log = __import__("logging").getLogger(__name__)
 
 
-def post_request(url, headers, data, files=None):
-    ssl_verify = toolkit.config.get("ckanext.csvwmapandtransform.ssl_verify")
+def post_request(url, headers, data, files=None, timeout=None):
+    ssl_verify = toolkit.asbool(
+        toolkit.config.get("ckanext.csvwmapandtransform.ssl_verify", True)
+    )
     if not ssl_verify:
+        log.warning(
+            "SSL verification disabled for rdfconverter — set ssl_verify=true in production"
+        )
         requests.packages.urllib3.disable_warnings()
 
     try:
         if files:
             # should create a multipart form upload
             response = requests.post(
-                url, data=data, headers=headers, files=files, verify=ssl_verify
+                url, data=data, headers=headers, files=files, verify=ssl_verify,
+                timeout=timeout,
             )
         else:
             # a application json post request
             response = requests.post(
-                url, data=json.dumps(data), headers=headers, verify=ssl_verify
+                url, data=json.dumps(data), headers=headers, verify=ssl_verify,
+                timeout=timeout,
             )
         
         # Log response details before raising for non-OK responses
@@ -62,15 +69,15 @@ def check_mapping(map_url: str, data_url: str, authorization: None):
     headers = {"Content-Type": "application/json"}
     if authorization:
         headers["Authorization"] = authorization
-    r = post_request(url, headers, data)
-    # r=requests.get(rdfconverter_url+"/info")
-    # log.debug(r)
+    timeout = toolkit.config.get(
+        "ckanext.csvwmapandtransform.rdfconverter_timeout_check", 30
+    )
+    r = post_request(url, headers, data, timeout=int(timeout))
     if r and r.status_code == 200:
         res = r.json()
         log.debug("map check results: {}".format(res))
         return res
     else:
-        log.debug("map check error: {}".format(r))
         return None
 
 
@@ -84,10 +91,13 @@ def get_joined_rdf(map_url: str, data_url: str, authorization: None):
     headers = {"Content-type": "application/json", "Accept": "application/json"}
     if authorization:
         headers["Authorization"] = authorization
-    log.debug(f"Request headers: {headers}")
+    log.debug(f"Request headers: {list(headers.keys())}")
     log.debug(f"Request data: {data}")
 
-    r = post_request(url, headers, data)
+    timeout = toolkit.config.get(
+        "ckanext.csvwmapandtransform.rdfconverter_timeout_create", 120
+    )
+    r = post_request(url, headers, data, timeout=int(timeout))
     
     if r is None:
         log.error(

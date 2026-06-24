@@ -10,7 +10,6 @@ else:
 
 
 import datetime
-import itertools
 import json
 import os
 from typing import Any
@@ -37,33 +36,21 @@ def find_first_matching_id(dicts: list, key: str, value: str):
 
 
 def csvwmapandtransform_find_mappings(context: Context, data_dict):
-    mapping_group_id = find_first_matching_id(
-        toolkit.get_action("group_list")({}, {"all_fields": True}),
-        key="name",
-        value=MAPPING_GROUP,
+    result = toolkit.get_action("package_search")(
+        {"ignore_auth": True},
+        {"fq": f"groups:{MAPPING_GROUP}", "rows": 1000, "include_private": False},
     )
-    if mapping_group_id:
-        mapping_group = toolkit.get_action("group_show")(
-            {"ignore_auth": True}, {"id": mapping_group_id, "include_datasets": True}
-        )
-    else:
-        log.warn("group with name mappings not found!")
-        mapping_group = create_group(MAPPING_GROUP)
-        log.info("created group mappings")
-    packages = mapping_group.get("packages", None)
-
-    if packages:
-        packages = [
-            toolkit.get_action("package_show")({}, {"id": package["id"]})
-            for package in packages
-        ]
-        resources = list(
-            itertools.chain.from_iterable(
-                [package["resources"] for package in packages]
-            )
-        )
-    else:
-        resources = list()
+    packages = result.get("results", [])
+    if not packages:
+        log.warn("group with name mappings not found or empty!")
+    resources = [
+        r
+        for pkg in packages
+        for r in pkg.get("resources", [])
+        if r.get("format", "").upper() == "YAML"
+    ]
+    if packages and not resources:
+        log.warning("Packages found in group '%s' but 0 YAML resources", MAPPING_GROUP)
     return resources
 
 
@@ -135,7 +122,8 @@ def csvwmapandtransform_transform_status(
                 "key": "csvwmapandtransform",
             },
         )
-    except:
+    except toolkit.ObjectNotFound:
+        log.debug("No task found for resource %s", res_id)
         status = None
     else:
         value = json.loads(task["value"])
@@ -217,25 +205,8 @@ def enqueue_transform(res_id, res_name, res_url, dataset_id, operation):
         assume_task_stale_after = datetime.timedelta(seconds=3600)
         assume_task_stillborn_after = datetime.timedelta(seconds=int(5))
         if existing_task.get("state") == "pending":
-            # queued_res_ids = [
-            #     re.search(r"'resource_id': u?'([^']+)'",
-            #               job.description).groups()[0]
-            #     for job in get_queue().get_jobs()
-            #     if 'xloader_to_datastore' in str(job)  # filter out test_job etc
-            # ]
             updated = parse_iso_date(existing_task["last_updated"])
             time_since_last_updated = datetime.datetime.utcnow() - updated
-            # if (res_id not in queued_res_ids
-            #         and time_since_last_updated > assume_task_stillborn_after):
-            #     # it's not on the queue (and if it had just been started then
-            #     # its taken too long to update the task_status from pending -
-            #     # the first thing it should do in the xloader job).
-            #     # Let it be restarted.
-            #     log.info('A pending task was found %r, but its not found in '
-            #              'the queue %r and is %s hours old',
-            #              existing_task['id'], queued_res_ids,
-            #              time_since_last_updated)
-            # elif time_since_last_updated > assume_task_stale_after:
             if time_since_last_updated > assume_task_stale_after:
                 # it's been a while since the job was last updated - it's more
                 # likely something went wrong with it and the state wasn't
@@ -347,7 +318,13 @@ def csvwmapandtransform_hook(context, data_dict):
     # task['task_info'] = job_info
     resubmit = False
 
-    if status in ("complete", "running_but_viewable"):
+    if status == "error":
+        log.debug("job errored now update job db at: {}".format(task))
+        db.init()
+        job_id = json.loads(task["value"])["job_id"]
+        db.mark_job_as_errored(job_id, data_dict.get("error"))
+
+    elif status in ("complete", "running_but_viewable"):
         # Create default views for resource if necessary (only the ones that
         # require data to be in the DataStore)
         resource_dict = toolkit.get_action("resource_show")(context, {"id": res_id})
