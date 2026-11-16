@@ -46,8 +46,8 @@ def init(db_uri: str = "", echo=False):
     if not db_uri:
         db_uri = toolkit.config.get("ckanext.csvwmapandtransform.db_url")
     global ENGINE, _METADATA, JOBS_TABLE, METADATA_TABLE, LOGS_TABLE
-    ENGINE = sqlalchemy.create_engine(db_uri, echo=echo, convert_unicode=True)
-    _METADATA = sqlalchemy.MetaData(ENGINE)
+    ENGINE = sqlalchemy.create_engine(db_uri, echo=echo)
+    _METADATA = sqlalchemy.MetaData()
     JOBS_TABLE = _init_jobs_table()
     METADATA_TABLE = _init_metadata_table()
     LOGS_TABLE = _init_logs_table()
@@ -109,10 +109,10 @@ def get_job(job_id):
     result_dict = {
         field: (
             value.isoformat()
-            if isinstance(value := getattr(result, field), datetime.datetime)
+            if isinstance(value := result._mapping[field], datetime.datetime)
             else value
         )
-        for field in result.keys()
+        for field in result._mapping.keys()
     }
 
     result_dict["metadata"] = _get_metadata(job_id)
@@ -231,7 +231,7 @@ def _update_job(job_id, job_dict):
     if "data" in job_dict:
         job_dict["data"] = six.text_type(job_dict["data"])
 
-    with ENGINE.connect() as conn:
+    with ENGINE.begin() as conn:
         conn.execute(
             JOBS_TABLE.update().where(JOBS_TABLE.c.job_id == job_id).values(**job_dict)
         )
@@ -375,7 +375,7 @@ def _get_metadata(job_id):
 
     metadata = {
         row["key"]: json.loads(row["value"]) if row["type"] == "json" else row["value"]
-        for row in results
+        for row in (r._mapping for r in results)
     }
     return metadata
 
@@ -389,7 +389,7 @@ def _get_logs(job_id):
             LOGS_TABLE.select().where(LOGS_TABLE.c.job_id == job_id)
         ).fetchall()
 
-    results = [dict(result) for result in results]
+    results = [dict(result._mapping) for result in results]
 
     for result in results:
         result.pop("job_id")
