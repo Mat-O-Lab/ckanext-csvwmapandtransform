@@ -55,6 +55,9 @@ class CsvwMapAndTransformPlugin(plugins.SingletonPlugin, DefaultTranslation):
         declaration.declare(
             group.formats, "json json-ld turtle n3 nt hext trig longturtle xml ld+json"
         )
+        declaration.declare(group.mapping_strategy, "exact")
+        declaration.declare(group.rdfconverter_timeout_check, 30)
+        declaration.declare(group.rdfconverter_timeout_create, 120)
 
     # IResourceUrlChange
 

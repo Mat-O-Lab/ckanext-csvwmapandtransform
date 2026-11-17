@@ -6,30 +6,55 @@ import requests
 log = __import__("logging").getLogger(__name__)
 
 
-def post_request(url, headers, data, files=None):
-    ssl_verify = toolkit.config.get("ckanext.csvwmapandtransform.ssl_verify")
+def post_request(url, headers, data, files=None, timeout=None):
+    ssl_verify = toolkit.asbool(
+        toolkit.config.get("ckanext.csvwmapandtransform.ssl_verify", True)
+    )
     if not ssl_verify:
+        log.warning(
+            "SSL verification disabled for rdfconverter — set ssl_verify=true in production"
+        )
         requests.packages.urllib3.disable_warnings()
 
     try:
         if files:
-            # should crate a multipart form upload
+            # should create a multipart form upload
             response = requests.post(
-                url, data=data, headers=headers, files=files, verify=ssl_verify
+                url, data=data, headers=headers, files=files, verify=ssl_verify,
+                timeout=timeout,
             )
         else:
             # a application json post request
             response = requests.post(
-                url, data=json.dumps(data), headers=headers, verify=ssl_verify
+                url, data=json.dumps(data), headers=headers, verify=ssl_verify,
+                timeout=timeout,
             )
+        
+        # Log response details before raising for non-OK responses
+        if not response.ok:
+            error_body = response.text[:500] if response.text else "No response body"
+            log.error(
+                f"HTTP {response.status_code} from {url}: {error_body}"
+            )
+        
         response.raise_for_status()
+        return response
 
-    except Exception as e:
-        # placeholder for save file / clean-up
-        log.error(e)
+    except requests.exceptions.HTTPError as e:
+        error_body = e.response.text[:500] if e.response and e.response.text else "No response body"
+        log.error(
+            f"HTTP Error {e.response.status_code if e.response else 'Unknown'} calling {url}: {error_body}"
+        )
         return None
-        # raise SystemExit(e) from None
-    return response
+    except requests.exceptions.ConnectionError as e:
+        log.error(f"Connection Error calling {url}: {str(e)}")
+        return None
+    except requests.exceptions.Timeout as e:
+        log.error(f"Timeout calling {url}: {str(e)}")
+        return None
+    except Exception as e:
+        log.error(f"Unexpected error calling {url}: {type(e).__name__}: {str(e)}")
+        return None
 
 
 def check_mapping(map_url: str, data_url: str, authorization: None):
@@ -44,20 +69,20 @@ def check_mapping(map_url: str, data_url: str, authorization: None):
     headers = {"Content-Type": "application/json"}
     if authorization:
         headers["Authorization"] = authorization
-    r = post_request(url, headers, data)
-    # r=requests.get(rdfconverter_url+"/info")
-    # log.debug(r)
+    timeout = toolkit.config.get(
+        "ckanext.csvwmapandtransform.rdfconverter_timeout_check", 30
+    )
+    r = post_request(url, headers, data, timeout=int(timeout))
     if r and r.status_code == 200:
         res = r.json()
         log.debug("map check results: {}".format(res))
         return res
     else:
-        log.debug("map check error: {}".format(r))
         return None
 
 
 def get_joined_rdf(map_url: str, data_url: str, authorization: None):
-    log.debug("createing joined rdf: {} with data url: {}".format(map_url, data_url))
+    log.info(f"Creating joined RDF with mapping: {map_url} and data: {data_url}")
     rdfconverter_url = toolkit.config.get(
         "ckanext.csvwmapandtransform.rdfconverter_url"
     )
@@ -66,27 +91,53 @@ def get_joined_rdf(map_url: str, data_url: str, authorization: None):
     headers = {"Content-type": "application/json", "Accept": "application/json"}
     if authorization:
         headers["Authorization"] = authorization
-    log.debug(f"headers: {headers}")
+    log.debug(f"Request headers: {list(headers.keys())}")
+    log.debug(f"Request data: {data}")
 
-    r = post_request(url, headers, data)
-    if r and r.status_code == 200:
-        r = r.json()
-        filename = r["filename"]
-        print(
-            "applied {} mapping rules and skipped {}".format(
-                r["num_mappings_applied"], r["num_mappings_skipped"]
+    timeout = toolkit.config.get(
+        "ckanext.csvwmapandtransform.rdfconverter_timeout_create", 120
+    )
+    r = post_request(url, headers, data, timeout=int(timeout))
+    
+    if r is None:
+        log.error(
+            f"Failed to get response from RDF converter at {url}. "
+            f"Mapping: {map_url}, Data: {data_url}"
+        )
+        return (None, None, None, None)
+    
+    if r.status_code == 200:
+        try:
+            response_json = r.json()
+            filename = response_json.get("filename")
+            graph = response_json.get("graph")
+            num_applied = response_json.get("num_mappings_applied")
+            num_skipped = response_json.get("num_mappings_skipped")
+            
+            if not filename or not graph:
+                log.error(
+                    f"RDF converter returned incomplete response. "
+                    f"Filename: {filename}, Graph present: {bool(graph)}"
+                )
+                return (None, None, None, None)
+            
+            log.info(
+                f"Successfully created RDF: {filename} "
+                f"(applied {num_applied} rules, skipped {num_skipped})"
             )
-        )
-        return (
-            filename,
-            r["graph"],
-            r["num_mappings_applied"],
-            r["num_mappings_skipped"],
-        )
+            return (filename, graph, num_applied, num_skipped)
+            
+        except (ValueError, KeyError) as e:
+            log.error(
+                f"Failed to parse RDF converter response: {type(e).__name__}: {str(e)}. "
+                f"Response: {r.text[:500]}"
+            )
+            return (None, None, None, None)
     else:
-        return (
-            None,
-            None,
-            None,
-            None,
+        error_msg = r.text[:500] if r.text else "No error message"
+        log.error(
+            f"RDF converter returned status {r.status_code}. "
+            f"Mapping: {map_url}, Data: {data_url}. "
+            f"Error: {error_msg}"
         )
+        return (None, None, None, None)

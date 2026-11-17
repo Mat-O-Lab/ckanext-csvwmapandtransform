@@ -52,7 +52,7 @@ ckan.module('csvwmapandtransform', function (jQuery) {
                       + value.icon +
                       "'></i><div class='alert alert-"
                       + value.alertlevel +
-                      " mb-0 mt-3' role='alert'>"
+                      " mb-0 mt-1 py-1' role='alert'>"
                       + value.message +
                       "</div><span class='date' title='timestamp'>"
                       + value.timestamp +
